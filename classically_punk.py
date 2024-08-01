@@ -203,7 +203,7 @@ class MusicGenreClassifier:
 # ------------------------------- MAIN -------------------------------
 def main():
     prompt_for_gpu()
-    
+    # ------------------------------- MusicDataProcessor
     dataset_path = 'genres'
     genre_classifier = MusicDataProcessor(dataset_path, 3, 'smaller_3_files')
     genre_classifier.load_data()
@@ -211,22 +211,19 @@ def main():
     print('music_data: \n', music_data)
 
 
-
-
-
-"""
+    # ------------------------------- MusicGenreClassifier
     classifier = MusicGenreClassifier(music_data)
     X_scaled, y_encoded = classifier.prepare_data()
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
     classifier.train(X_train, y_train, X_test, y_test)
     classifier.evaluate(X_test, y_test)
 
-    # Predict genre
+    # ------------------------------- predict_genre
     # Adjusts input music files dynamically, user input, selections, etc.
     # hard coded sigle file for now
     genre = classifier.predict_genre('genres/blues/blues.00000.wav')
     print(f'The predicted genre is: {genre}')
-"""
+
 
 if __name__ == '__main__':
     main()
