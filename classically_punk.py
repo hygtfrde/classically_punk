@@ -44,6 +44,9 @@ class MusicDataProcessor:
             mel = librosa.feature.melspectrogram(y=y, sr=sr)
             contrast = librosa.feature.spectral_contrast(y=y, sr=sr)
             tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
+            harmony = librosa.effects.harmonic(y)
+            perceptr = librosa.effects.percussive(y)
+            tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             return None, None, None, None, None
@@ -56,9 +59,12 @@ class MusicDataProcessor:
                 mel: {mel} \n
                 contrast: {contrast} \n
                 tonnetz: {tonnetz}
+                harmony: {harmony} \n
+                perceptr: {perceptr} \n
+                tempo: {tempo}
               ''')
         
-        return mfcc, chroma, mel, contrast, tonnetz
+        return mfcc, chroma, mel, contrast, tonnetz, harmony, perceptr, tempo
                 
     def load_data(self):
         all_data = []
@@ -68,7 +74,7 @@ class MusicDataProcessor:
             for file in os.listdir(genre_dir):
                 if counter >= self.file_depth_limit: break
                 file_path = os.path.join(genre_dir, file)
-                mfcc, chroma, mel, contrast, tonnetz = self.extract_features(file_path)
+                mfcc, chroma, mel, contrast, tonnetz, harmony, perceptr, tempo = self.extract_features(file_path)
                 if mfcc is not None:
                     all_data.append({
                         'filename': file,
@@ -77,18 +83,28 @@ class MusicDataProcessor:
                         'chroma': chroma,
                         'mel': mel,
                         'contrast': contrast,
-                        'tonnetz': tonnetz
+                        'tonnetz': tonnetz,
+                        'harmony': harmony,
+                        'perceptr': perceptr,
+                        'tempo': tempo
                     })
                 counter += 1
         self.data = pd.DataFrame(all_data)
     
-    def get_data(self):
-        self.save_data_to_excel(f'{self.excel_output_name}_genres_df.xlsx')
-        return self.data
-
     def save_data_to_excel(self, file_name):
         self.data.to_excel(file_name, index=False)
         print(f'Data saved to {file_name}')
+
+    def get_data(self):
+        df_output_dir = 'df_output'
+        if not os.path.exists(df_output_dir):
+            os.makedirs(df_output_dir)
+            print(f"Directory '{df_output_dir}' created.")
+        else:
+            print(f"Directory '{df_output_dir}' already exists.")
+        self.save_data_to_excel(f'{df_output_dir}/{self.excel_output_name}_genres_df.xlsx')
+        return self.data
+
 
 
 
@@ -194,6 +210,11 @@ def main():
     music_data = genre_classifier.get_data()
     print('music_data: \n', music_data)
 
+
+
+
+
+"""
     classifier = MusicGenreClassifier(music_data)
     X_scaled, y_encoded = classifier.prepare_data()
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
@@ -205,7 +226,7 @@ def main():
     # hard coded sigle file for now
     genre = classifier.predict_genre('genres/blues/blues.00000.wav')
     print(f'The predicted genre is: {genre}')
-
+"""
 
 if __name__ == '__main__':
     main()
