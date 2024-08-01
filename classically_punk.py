@@ -81,8 +81,9 @@ class MusicGenreClassifier:
         self.genres = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
         self.encoder = LabelEncoder()
         self.scaler = StandardScaler()
-        self.model = self._build_model()
-    
+        self.feature_dim = None
+        self.model = None
+
     def flatten_features(self, features):
         return np.hstack([np.mean(f, axis=1) for f in features])
     
@@ -94,18 +95,23 @@ class MusicGenreClassifier:
             row['contrast'], 
             row['tonnetz']
         ]) for _, row in self.data.iterrows()])
-        
-        print(f"Feature shape: {X.shape}")
+
+        print(f"Feature shape before scaling: {X.shape}")
 
         y = self.data['genre'].values
         y_encoded = self.encoder.fit_transform(y)
         X_scaled = self.scaler.fit_transform(X)
         
+        self.feature_dim = X_scaled.shape[1]
+        
         return X_scaled, y_encoded
-    
+
     def _build_model(self):
+        if self.feature_dim is None:
+            raise ValueError("Feature dimension is not set. Call prepare_data() first.")
+
         model = Sequential([
-            Input(shape=(93,)),
+            Input(shape=(self.feature_dim,)),
             Dense(256, activation='relu'),
             Dropout(0.3),
             Dense(128, activation='relu'),
@@ -118,9 +124,12 @@ class MusicGenreClassifier:
         return model
     
     def train(self, X_train, y_train, X_test, y_test, epochs=50, batch_size=32):
+        self.model = self._build_model()
         self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(X_test, y_test))
     
     def evaluate(self, X_test, y_test):
+        if self.model is None:
+            raise ValueError("Model is not built. Call train() first.")
         loss, accuracy = self.model.evaluate(X_test, y_test)
         print(f'Test accuracy: {accuracy}')
         return accuracy
@@ -140,7 +149,6 @@ class MusicGenreClassifier:
         genre = self.encoder.inverse_transform([np.argmax(prediction)])
         
         return genre[0]
-
 
 
 # ------------------------------- MAIN -------------------------------
