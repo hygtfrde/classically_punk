@@ -1,15 +1,32 @@
 import os
+import datetime
 import librosa
 import pandas as pd
 import openpyxl
+import importlib.util
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Input, Dense, Dropout
+from tensorflow.keras.callbacks import TensorBoard
 
 
+
+def prompt_for_gpu():
+    response = input("Do you want to use GPU for training if available? (Y/N): ").strip().lower()
+    if response == 'y':
+        script_path = os.path.join('scripts', 'config_tf.py')
+        if os.path.exists(script_path):
+            spec = importlib.util.spec_from_file_location("config_tf", script_path)
+            config_tf = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(config_tf)
+            print("GPU setup completed successfully.")
+            print('To manage GPU usage: tensorboard --logdir=logs/fit')
+        else:
+            print("GPU configuration script not found.")
+            
 
 class MusicDataProcessor:
     def __init__(self, dataset_path: str, file_depth_limit: int, excel_output_name: str):
@@ -125,8 +142,24 @@ class MusicGenreClassifier:
     
     def train(self, X_train, y_train, X_test, y_test, epochs=50, batch_size=32):
         self.model = self._build_model()
-        self.model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(X_test, y_test))
-    
+        
+        log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+
+        history = self.model.fit(
+            X_train, 
+            y_train, 
+            epochs=epochs, 
+            batch_size=batch_size, 
+            validation_data=(X_test, y_test),
+            verbose=1,
+            callbacks=[tensorboard_callback]
+        )
+        
+        print("Training history:")
+        for key in history.history.keys():
+            print(f"{key}: {history.history[key]}")
+
     def evaluate(self, X_test, y_test):
         if self.model is None:
             raise ValueError("Model is not built. Call train() first.")
@@ -153,6 +186,8 @@ class MusicGenreClassifier:
 
 # ------------------------------- MAIN -------------------------------
 def main():
+    prompt_for_gpu()
+    
     dataset_path = 'genres'
     genre_classifier = MusicDataProcessor(dataset_path, 3, 'smaller_3_files')
     genre_classifier.load_data()

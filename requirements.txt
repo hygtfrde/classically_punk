@@ -3,3 +3,7 @@ pandas
 numpy 
 scikit-learn 
 tensorflow
+
+# Required for MacOS Metal
+tensorflow-macos 
+tensorflow-metal
