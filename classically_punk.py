@@ -42,8 +42,9 @@ class MusicDataProcessor:
               ''')
         
         return mfcc, chroma, mel, contrast, tonnetz
-
+                
     def load_data(self):
+        all_data = []
         for genre in self.genres:
             counter = 0
             genre_dir = os.path.join(self.dataset_path, genre)
@@ -51,18 +52,18 @@ class MusicDataProcessor:
                 if counter >= self.file_depth_limit: break
                 file_path = os.path.join(genre_dir, file)
                 mfcc, chroma, mel, contrast, tonnetz = self.extract_features(file_path)
-                
-                row = pd.DataFrame({
-                    'filename': [file],
-                    'genre': [genre],
-                    'mfcc': [mfcc],
-                    'chroma': [chroma],
-                    'mel': [mel],
-                    'contrast': [contrast],
-                    'tonnetz': [tonnetz]
-                })
+                if mfcc is not None:
+                    all_data.append({
+                        'filename': file,
+                        'genre': genre,
+                        'mfcc': mfcc,
+                        'chroma': chroma,
+                        'mel': mel,
+                        'contrast': contrast,
+                        'tonnetz': tonnetz
+                    })
                 counter += 1
-                self.data = pd.concat([self.data, row], ignore_index=True)
+        self.data = pd.DataFrame(all_data)
     
     def get_data(self):
         self.save_data_to_excel(f'{self.excel_output_name}_genres_df.xlsx')
@@ -93,6 +94,8 @@ class MusicGenreClassifier:
             row['contrast'], 
             row['tonnetz']
         ]) for _, row in self.data.iterrows()])
+        
+        print(f"Feature shape: {X.shape}")
 
         y = self.data['genre'].values
         y_encoded = self.encoder.fit_transform(y)
@@ -143,7 +146,7 @@ class MusicGenreClassifier:
 # ------------------------------- MAIN -------------------------------
 def main():
     dataset_path = 'genres'
-    genre_classifier = MusicDataProcessor(dataset_path, 3, 'smaller_dataset')
+    genre_classifier = MusicDataProcessor(dataset_path, 3, 'smaller_3_files')
     genre_classifier.load_data()
     music_data = genre_classifier.get_data()
     print('music_data: \n', music_data)
