@@ -1,6 +1,7 @@
 import os
 import datetime
 import ast
+import json
 import librosa
 import pandas as pd
 import openpyxl
@@ -14,22 +15,6 @@ from tensorflow.keras.layers import Input, Dense, Dropout
 from tensorflow.keras.callbacks import TensorBoard
 
 
-
-def prompt_for_gpu():
-    response = input("Do you want to use GPU for training if available? (Y/N): ").strip().lower()
-    if response == 'y':
-        script_path = os.path.join('scripts', 'config_tf.py')
-        if os.path.exists(script_path):
-            spec = importlib.util.spec_from_file_location("config_tf", script_path)
-            config_tf = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(config_tf)
-            print("GPU setup completed successfully.")
-            print('To manage GPU usage run: \n tensorboard --logdir=logs/fit')
-        else:
-            print("GPU configuration script not found.")
-    else:
-        print("Using CPU defaults for training.")
-        tf.config.set_visible_devices([], 'GPU')
             
 
 class MusicDataProcessor:
@@ -121,39 +106,79 @@ class MusicGenreClassifier:
         self.feature_dim = None
         self.model = None
 
-    
+
+    def preprocess_string(self, s):
+        # Replace spaces with commas
+        s = s.replace(' ', ',')
+        # Add necessary brackets if missing
+        if not (s.startswith('[') and s.endswith(']')):
+            s = f'[{s}]'
+        return s
+
+    def parse_feature(self, feature_str):
+        try:
+            processed_str = self.preprocess_string(feature_str)
+            feature_list = json.loads(processed_str)
+            return np.array(feature_list)
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Error converting string to array: {e}")
+            print(f"Invalid string: {feature_str}")
+            return None
+
+    def validate_dataframe(self):
+        valid = True
+
+        # Check for non-null and correct data types
+        for column in ['mfcc', 'chroma', 'mel', 'contrast', 'tonnetz', 'harmony', 'perceptr', 'tempo']:
+            if self.data[column].isnull().any():
+                print(f"Error: Column '{column}' contains null values.")
+                valid = False
+
+            # Validate each cell in the feature columns
+            for i, feature in enumerate(self.data[column]):
+                parsed_feature = self.parse_feature(feature)
+                if parsed_feature is None:
+                    print(f"Error: Failed to parse feature at row {i} in column '{column}'.")
+                    valid = False
+                elif len(parsed_feature.shape) != 1:
+                    print(f"Error: Feature at row {i} in column '{column}' is not 1D. Shape: {parsed_feature.shape}")
+                    valid = False
+        print(f"Is DF validated? ===> {valid}")
+        return valid
+
+
+
     def flatten_features(self, features):
         flattened_features = []
-        
+
         for f in features:
             if isinstance(f, str):
+                print(f"Original string: {f}")
                 try:
                     # Convert string representation of array back to numpy array
-                    f = np.array(ast.literal_eval(f))
-                except (SyntaxError, ValueError) as e:
+                    f = np.array(json.loads(f))
+                except (json.JSONDecodeError, ValueError) as e:
                     print(f"Error converting string to array: {e}")
+                    print(f"Invalid string: {f}")
                     continue
 
             if f is None or not hasattr(f, 'size') or not f.size:
                 print(f"Warning: Skipping empty or None feature: {f}")
                 continue
-            
+
             print(f"Feature shape before flattening: {f.shape}")
-            
+
             if len(f.shape) == 1:
-                # If the feature array is 1D, simply append it as is
                 flattened_features.append(f)
             elif len(f.shape) == 2 and f.shape[1] > 1:
-                # Compute mean along axis 1 if the feature array is 2D
                 flattened_features.append(np.mean(f, axis=1))
             else:
                 print(f"Warning: Unexpected feature shape: {f.shape}. Skipping this feature.")
-        
+
         if not flattened_features:
             print("Error: No valid features to flatten.")
             return np.array([])
-        
-        # Stack the flattened features horizontally
+
         return np.hstack(flattened_features)
 
     
@@ -241,6 +266,8 @@ class MusicGenreClassifier:
 
 
 
+
+# ------------------------------- HELPERS
 def get_user_input(prompt, default_value=True):
     while True:
         response = input(prompt).strip().lower()
@@ -250,11 +277,29 @@ def get_user_input(prompt, default_value=True):
             return default_value
         else:
             print("Invalid input. Please enter 'Y' for Yes or 'N' for No.")
+            
+def prompt_for_gpu():
+    response = input("Do you want to use GPU for training if available? (Y/N): ").strip().lower()
+    if response == 'y':
+        script_path = os.path.join('scripts', 'config_tf.py')
+        if os.path.exists(script_path):
+            spec = importlib.util.spec_from_file_location("config_tf", script_path)
+            config_tf = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(config_tf)
+            print("GPU setup completed successfully.")
+            print('To manage GPU usage run: \n tensorboard --logdir=logs/fit')
+        else:
+            print("GPU configuration script not found.")
+    else:
+        print("Using CPU defaults for training.")
+        tf.config.set_visible_devices([], 'GPU')
 
 
 # ------------------------------- MAIN -------------------------------
 def main():
     BLUE = '\033[34m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
     RESET = '\033[0m'
     
     print("Configure the following options:")
@@ -268,7 +313,7 @@ def main():
     if process_data:
         print(f"{BLUE}Begin Data Processing{RESET}")
         dataset_path = 'genres'
-        genre_classifier = MusicDataProcessor(dataset_path, 3, 'smaller_3_files')
+        genre_classifier = MusicDataProcessor(dataset_path, 1, 'just_1_file')
         genre_classifier.load_data()
         music_data = genre_classifier.get_data()
         print('music_data: \n', music_data)
@@ -280,11 +325,17 @@ def main():
         prompt_for_gpu()
         print(f"{BLUE}Begin Model Training{RESET}")
         
-        static_df = pd.read_excel('df_output/smaller_3_files_genres_df.xlsx')
+        static_df = pd.read_excel('df_output/just_1_file_genres_df.xlsx')
         print(static_df['mfcc'].head())
         print(static_df['chroma'].head())
         
         classifier = MusicGenreClassifier(static_df)
+        classifier.validate_dataframe()
+        if not classifier: 
+            print(f'{RED}validate_dataframe failed{RESET}')
+            return
+        else: (f'{GREEN}validate_dataframe success{RESET}')
+        
         X_scaled, y_encoded = classifier.prepare_data()
         X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
         classifier.train(X_train, y_train, X_test, y_test)
