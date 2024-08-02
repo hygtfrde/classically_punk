@@ -26,6 +26,9 @@ def prompt_for_gpu():
             print('To manage GPU usage: tensorboard --logdir=logs/fit')
         else:
             print("GPU configuration script not found.")
+    else:
+        print("Using CPU defaults for training.")
+        tf.config.set_visible_devices([], 'GPU')
             
 
 class MusicDataProcessor:
@@ -200,30 +203,61 @@ class MusicGenreClassifier:
         return genre[0]
 
 
+
+def get_user_input(prompt, default_value=True):
+    while True:
+        response = input(prompt).strip().lower()
+        if response in ['y', 'n']:
+            return response == 'y'
+        elif response == '':
+            return default_value
+        else:
+            print("Invalid input. Please enter 'Y' for Yes or 'N' for No.")
+
+
 # ------------------------------- MAIN -------------------------------
-def main():
-    prompt_for_gpu()
+def main(process_data=True, train_model=True, predict_genre=True):
+    BLUE = '\033[34m'
+    RESET = '\033[0m'
+    
+    print("Configure the following options:")
+    process_data = get_user_input("Do you want to process data? (Y/N): ", default_value=True)
+    train_model = get_user_input("Do you want to train the model? (Y/N): ", default_value=True)
+    predict_genre = get_user_input("Do you want to predict genre? (Y/N): ", default_value=True)
+    
+    
     # ------------------------------- MusicDataProcessor
-    dataset_path = 'genres'
-    genre_classifier = MusicDataProcessor(dataset_path, 3, 'smaller_3_files')
-    genre_classifier.load_data()
-    music_data = genre_classifier.get_data()
-    print('music_data: \n', music_data)
+    if process_data:
+        print(f"{BLUE}Begin Data Processing{RESET}")
+        dataset_path = 'genres'
+        genre_classifier = MusicDataProcessor(dataset_path, 3, 'smaller_3_files')
+        genre_classifier.load_data()
+        music_data = genre_classifier.get_data()
+        print('music_data: \n', music_data)
+    else: print('Skipping Data Processing')
 
 
     # ------------------------------- MusicGenreClassifier
-    classifier = MusicGenreClassifier(music_data)
-    X_scaled, y_encoded = classifier.prepare_data()
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
-    classifier.train(X_train, y_train, X_test, y_test)
-    classifier.evaluate(X_test, y_test)
+    if train_model:
+        prompt_for_gpu()
+        print(f"{BLUE}Begin Model Training{RESET}")
+        
+        classifier = MusicGenreClassifier(music_data)
+        X_scaled, y_encoded = classifier.prepare_data()
+        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
+        classifier.train(X_train, y_train, X_test, y_test)
+        classifier.evaluate(X_test, y_test)
+    else: print('Skipping Model Training')
 
     # ------------------------------- predict_genre
     # Adjusts input music files dynamically, user input, selections, etc.
     # hard coded sigle file for now
-    genre = classifier.predict_genre('genres/blues/blues.00000.wav')
-    print(f'The predicted genre is: {genre}')
+    if predict_genre:
+        print(f"{BLUE}Begin Genre Predictor{RESET}")
+        genre = classifier.predict_genre('genres/blues/blues.00000.wav')
+        print(f'The predicted genre is: {genre}')
+    else: print('Skipping Genre Predictor')
 
 
 if __name__ == '__main__':
-    main()
+    main(False, True, False)

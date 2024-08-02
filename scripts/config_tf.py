@@ -18,7 +18,7 @@ def configure_gpus():
         except RuntimeError as e:
             print(f"Error during GPU setup: {e}")
     else:
-        print("No GPU devices found.")
+        print("No GPU devices found. Using CPU.")
 
 if __name__ == "__main__":
     configure_gpus()
