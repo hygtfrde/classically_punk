@@ -1,5 +1,6 @@
 import os
 import datetime
+import ast
 import librosa
 import pandas as pd
 import openpyxl
@@ -23,7 +24,7 @@ def prompt_for_gpu():
             config_tf = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(config_tf)
             print("GPU setup completed successfully.")
-            print('To manage GPU usage: tensorboard --logdir=logs/fit')
+            print('To manage GPU usage run: \n tensorboard --logdir=logs/fit')
         else:
             print("GPU configuration script not found.")
     else:
@@ -37,7 +38,7 @@ class MusicDataProcessor:
         self.file_depth_limit = file_depth_limit
         self.excel_output_name = excel_output_name
         self.genres = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
-        self.data = pd.DataFrame(columns=['filename', 'genre', 'mfcc', 'chroma', 'mel', 'contrast', 'tonnetz'])
+        self.data = pd.DataFrame(columns=['filename', 'genre', 'mfcc', 'chroma', 'mel', 'contrast', 'tonnetz', 'harmony', 'perceptr', 'tempo'])
     
     def extract_features(self, file_path):
         try:
@@ -52,7 +53,7 @@ class MusicDataProcessor:
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
-            return None, None, None, None, None
+            return None
         
         print(f'''EXTRACTING: {file_path} \n 
                 y: {y} \n
@@ -120,8 +121,41 @@ class MusicGenreClassifier:
         self.feature_dim = None
         self.model = None
 
+    
     def flatten_features(self, features):
-        return np.hstack([np.mean(f, axis=1) for f in features])
+        flattened_features = []
+        
+        for f in features:
+            if isinstance(f, str):
+                try:
+                    # Convert string representation of array back to numpy array
+                    f = np.array(ast.literal_eval(f))
+                except (SyntaxError, ValueError) as e:
+                    print(f"Error converting string to array: {e}")
+                    continue
+
+            if f is None or not hasattr(f, 'size') or not f.size:
+                print(f"Warning: Skipping empty or None feature: {f}")
+                continue
+            
+            print(f"Feature shape before flattening: {f.shape}")
+            
+            if len(f.shape) == 1:
+                # If the feature array is 1D, simply append it as is
+                flattened_features.append(f)
+            elif len(f.shape) == 2 and f.shape[1] > 1:
+                # Compute mean along axis 1 if the feature array is 2D
+                flattened_features.append(np.mean(f, axis=1))
+            else:
+                print(f"Warning: Unexpected feature shape: {f.shape}. Skipping this feature.")
+        
+        if not flattened_features:
+            print("Error: No valid features to flatten.")
+            return np.array([])
+        
+        # Stack the flattened features horizontally
+        return np.hstack(flattened_features)
+
     
     def prepare_data(self):
         X = np.array([self.flatten_features([
@@ -129,7 +163,10 @@ class MusicGenreClassifier:
             row['chroma'], 
             row['mel'], 
             row['contrast'], 
-            row['tonnetz']
+            row['tonnetz'],
+            row['harmony'],
+            row['perceptr'],
+            row['tempo']
         ]) for _, row in self.data.iterrows()])
 
         print(f"Feature shape before scaling: {X.shape}")
@@ -216,7 +253,7 @@ def get_user_input(prompt, default_value=True):
 
 
 # ------------------------------- MAIN -------------------------------
-def main(process_data=True, train_model=True, predict_genre=True):
+def main():
     BLUE = '\033[34m'
     RESET = '\033[0m'
     
@@ -227,6 +264,7 @@ def main(process_data=True, train_model=True, predict_genre=True):
     
     
     # ------------------------------- MusicDataProcessor
+    music_data = None
     if process_data:
         print(f"{BLUE}Begin Data Processing{RESET}")
         dataset_path = 'genres'
@@ -242,16 +280,20 @@ def main(process_data=True, train_model=True, predict_genre=True):
         prompt_for_gpu()
         print(f"{BLUE}Begin Model Training{RESET}")
         
-        classifier = MusicGenreClassifier(music_data)
+        static_df = pd.read_excel('df_output/smaller_3_files_genres_df.xlsx')
+        print(static_df['mfcc'].head())
+        print(static_df['chroma'].head())
+        
+        classifier = MusicGenreClassifier(static_df)
         X_scaled, y_encoded = classifier.prepare_data()
         X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
         classifier.train(X_train, y_train, X_test, y_test)
         classifier.evaluate(X_test, y_test)
     else: print('Skipping Model Training')
 
-    # ------------------------------- predict_genre
+    # ------------------------------- Predict a Genre
     # Adjusts input music files dynamically, user input, selections, etc.
-    # hard coded sigle file for now
+    # hard coded single file for now
     if predict_genre:
         print(f"{BLUE}Begin Genre Predictor{RESET}")
         genre = classifier.predict_genre('genres/blues/blues.00000.wav')
@@ -260,4 +302,4 @@ def main(process_data=True, train_model=True, predict_genre=True):
 
 
 if __name__ == '__main__':
-    main(False, True, False)
+    main()
