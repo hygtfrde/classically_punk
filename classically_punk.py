@@ -49,6 +49,8 @@ class AudioDataVisualizer:
             os.makedirs('visualizations')
         if not os.path.exists('visualizations/_test_audio_waveform_spectogram'):
             os.makedirs('visualizations/_test_audio_waveform_spectogram')
+        if not os.path.exists('visualizations/extracted_audio_data'):
+            os.makedirs('visualizations/extracted_audio_data')
 
     # ------------------------------- AUDIO FILE VISUALIZERS
     def plot_waveform(self, audio_data, sample_rate, filename):
@@ -89,7 +91,7 @@ class AudioDataVisualizer:
         plt.title(f'MFCC - {filename}')
         plt.xlabel('Time')
         plt.ylabel('MFCC Coefficients')
-        plt.savefig(f'visualizations/{filename}_mfccs.png')
+        plt.savefig(f'visualizations/extracted_audio_data/{filename}_mfccs.png')
         plt.close()
         
     def plot_chroma(self, chroma, filename):
@@ -99,7 +101,7 @@ class AudioDataVisualizer:
         plt.title(f'Chroma - {filename}')
         plt.xlabel('Time')
         plt.ylabel('Chroma Coefficients')
-        plt.savefig(f'visualizations/{filename}_chroma.png')
+        plt.savefig(f'visualizations/extracted_audio_data/{filename}_chroma.png')
         plt.close()
         
     def plot_feature(self, feature, feature_name, filename):
@@ -122,7 +124,7 @@ class AudioDataVisualizer:
         else:
             raise ValueError(f'Unsupported feature type: {feature_name}')
         
-        plt.savefig(f'visualizations/{filename}_{feature_name.lower()}.png')
+        plt.savefig(f'visualizations/extracted_audio_data/{filename}_{feature_name.lower()}.png')
         plt.close()
 
     def plot_1d_feature(self, feature, feature_name, filename):
@@ -131,7 +133,7 @@ class AudioDataVisualizer:
         plt.title(f'{feature_name} - {filename}')
         plt.xlabel('Time')
         plt.ylabel(f'{feature_name} Values')
-        plt.savefig(f'visualizations/{filename}_{feature_name.lower()}.png')
+        plt.savefig(f'visualizations/extracted_audio_data/{filename}_{feature_name.lower()}.png')
         plt.close()
 
     def plot_scalar_feature(self, value, feature_name, filename):
@@ -139,7 +141,7 @@ class AudioDataVisualizer:
         plt.bar(feature_name, value)
         plt.title(f'{feature_name} - {filename}')
         plt.ylabel(f'{feature_name} Value')
-        plt.savefig(f'visualizations/{filename}_{feature_name.lower()}.png')
+        plt.savefig(f'visualizations/extracted_audio_data/{filename}_{feature_name.lower()}.png')
         plt.close()
     # -------------------------------
 
@@ -310,7 +312,10 @@ class MusicDataProcessor:
         
         file_path = os.path.join(df_output_dir, f'{self.excel_output_name}_genres_df.xlsx')
         
-        self.data.to_excel(file_path, index=False)
+        # self.data.to_excel(file_path, index=False)
+        # self.data.to_csv(f'{df_output_dir}/_default_data.csv', index=False)
+        # self.data.to_parquet(f'{df_output_dir}/_default_data.parquet', engine='fastparquet')
+        
         print(f"Data saved to {file_path}")
 
         return self.data
@@ -536,8 +541,8 @@ def prompt_for_gpu():
 # ------------------------------- MAIN -------------------------------
 def main():
     print("Configure the following options:")
-    process_data = get_user_input("Do you want to process data? (Y/N): ", default_value=True)
-    visualize_data = get_user_input("Do you want to visualize data? (Y/N): ", default_value=True)
+    process_data = get_user_input("Do you want to process and visualize data? (Y/N): ", default_value=True)
+    # visualize_data = get_user_input("Do you want to visualize data? (Y/N): ", default_value=True)
     train_model = get_user_input("Do you want to train the model? (Y/N): ", default_value=True)
     predict_genre = get_user_input("Do you want to predict genre? (Y/N): ", default_value=True)
     
@@ -555,24 +560,29 @@ def main():
 
         print("Getting data...")
         music_data = genre_classifier.get_data()
-        print('Music data: \n', music_data)
+        print('Music Data for Processor: \n', music_data)
+        visualizer = AudioDataVisualizer(music_data)
+        print("Plotting data...")
+        visualizer.visualize(1)
     else: print('Skipping Data Processing')
     
     
     # ------------------------------- AudioDataVisualizer
-    default_df_file_path = 'df_output/_default.xlsx'
-    if visualize_data:
-        if music_data is None:
-            if not os.path.exists(default_df_file_path):
-                print(f"Default DF file {default_df_file_path} does not exist. Aborting.")
-                return
-            else:
-                music_data = pd.read_excel(default_df_file_path)
+    # if visualize_data:
+    #     if music_data is None:
+    #         print('Using Default DF for music data')
+    #         default_csv_file_path = 'df_output/_default_data.parquet'
+    #         if not os.path.exists(default_csv_file_path):
+    #             print(f"Default DF file {default_csv_file_path} does not exist. Aborting.")
+    #             return
+    #         else:
+    #             music_data = pd.read_parquet(default_csv_file_path, engine='fastparquet')
+    #             print(f'Music Data for Visualizer: \n', music_data)
         
-        visualizer = AudioDataVisualizer(music_data)
-        visualizer.visualize(1)
-    else:
-        print('Skipping Data Visualization')
+    #     visualizer = AudioDataVisualizer(music_data)
+    #     visualizer.visualize(1)
+    # else:
+    #     print('Skipping Data Visualization')
 
 
     # ------------------------------- MusicGenreClassifier
