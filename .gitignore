@@ -1,8 +1,13 @@
 logs/*
 blob*
 
+scripts/.DS_Store
 
 visualizations/*
 !visualizations/
 !visualizations/_viz.md
 !visualizations/_test_audio_waveform_spectogram
+
+df_output/_default.xlsx
+!df_output
+!df_output/_df_output.md
