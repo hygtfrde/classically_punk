@@ -3,6 +3,9 @@ pandas
 numpy 
 scikit-learn 
 tensorflow
+pyarrow
+fastparquet
+
 
 # Required for MacOS Metal
 tensorflow-macos 
