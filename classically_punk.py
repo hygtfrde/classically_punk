@@ -28,6 +28,7 @@ from tensorflow.keras.callbacks import TensorBoard
     - perceptr: Perceptual features.
     - tempo: The tempo of the audio file.
 """
+
 genres_from_dataset = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
 columns_from_extracted_librosa_audio_data = ['filename', 'genre', 'mfcc', 'chroma', 'mel', 'contrast', 'tonnetz', 'harmony_mean', 'harmony_std', 'perceptr_mean', 'perceptr_std', 'tempo']
 test_audio_file_1 = 'genres/blues/blues.00000.wav'
@@ -559,12 +560,19 @@ def main():
     
     
     # ------------------------------- AudioDataVisualizer
+    default_df_file_path = 'df_output/_default.xlsx'
     if visualize_data:
         if music_data is None:
-            music_data = pd.read_excel('df_output/_default.xlsx')
+            if not os.path.exists(default_df_file_path):
+                print(f"Default DF file {default_df_file_path} does not exist. Aborting.")
+                return
+            else:
+                music_data = pd.read_excel(default_df_file_path)
+        
         visualizer = AudioDataVisualizer(music_data)
         visualizer.visualize(1)
-    else: print('Skipping Data Visualization')
+    else:
+        print('Skipping Data Visualization')
 
 
     # ------------------------------- MusicGenreClassifier
