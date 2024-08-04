@@ -1,5 +1,6 @@
 logs/*
 blob*
+_blob*
 
 scripts/.DS_Store
 
