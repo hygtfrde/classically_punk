@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import spectrogram
 import librosa
-
+import librosa.display
 
 class AudioDataVisualizer:
     def __init__(self, df):
@@ -41,64 +41,32 @@ class AudioDataVisualizer:
     # -------------------------------
 
     # ------------------------------- LIBROSA AUDIO DATA VISUALIZERS
-    def plot_mfccs(self, mfccs, filename):
-        # Ensure mfccs is a numerical NumPy array
-        mfccs = np.array(mfccs, dtype=np.float32)  # Convert to float32 for numerical operations
-
-        # Handle potential non-finite values
-        mfccs = np.nan_to_num(mfccs, copy=False)  # Replace NaN and inf with 0
-
-        # Ensure all values in mfccs are finite
-        mfccs = np.where(np.isfinite(mfccs), mfccs, 0)
-        
+    def plot_mfccs(self, mfcc_mean, mfcc_std, filename):
+        # Plotting mean and standard deviation
         plt.figure(figsize=(12, 6))
-        librosa.display.specshow(mfccs, x_axis='time')
-        plt.colorbar()
-        plt.title(f'MFCC - {filename}')
-        plt.xlabel('Time')
-        plt.ylabel('MFCC Coefficients')
+        plt.errorbar(np.arange(len(mfcc_mean)), mfcc_mean, yerr=mfcc_std, fmt='-o', capsize=5)
+        plt.title(f'MFCC Mean and Std Dev - {filename}')
+        plt.xlabel('MFCC Coefficients')
+        plt.ylabel('Mean Value')
         plt.savefig(f'visualizations/extracted_audio_data/{filename}_mfccs.png')
         plt.close()
         
-    def plot_chroma(self, chroma, filename):
+    def plot_chroma(self, chroma_mean, chroma_std, filename):
+        # Plotting mean and standard deviation
         plt.figure(figsize=(12, 6))
-        librosa.display.specshow(chroma, x_axis='time')
-        plt.colorbar()
-        plt.title(f'Chroma - {filename}')
-        plt.xlabel('Time')
-        plt.ylabel('Chroma Coefficients')
+        plt.errorbar(np.arange(len(chroma_mean)), chroma_mean, yerr=chroma_std, fmt='-o', capsize=5)
+        plt.title(f'Chroma Mean and Std Dev - {filename}')
+        plt.xlabel('Chroma Coefficients')
+        plt.ylabel('Mean Value')
         plt.savefig(f'visualizations/extracted_audio_data/{filename}_chroma.png')
         plt.close()
-        
-    def plot_feature(self, feature, feature_name, filename):
-        plt.figure(figsize=(12, 6))
 
-        if feature_name in ['Chroma', 'Mel', 'Contrast', 'Tonnetz']:
-            # Assuming these features are 2D
-            if feature.ndim == 2:
-                librosa.display.specshow(feature, x_axis='time')
-                plt.colorbar()
-            else:
-                raise ValueError(f'Feature for {feature_name} must be a 2D array.')
-        elif feature_name in ['Harmony', 'Perceptr']:
-            # Assuming these features are 1D
-            print(f'{feature_name} => feature.ndim: {feature.ndim}')
-            if feature.ndim == 1:
-                self.plot_1d_feature(feature, feature_name, filename)
-            else:
-                raise ValueError(f'Feature for {feature_name} must be a 1D array.')
-        else:
-            raise ValueError(f'Unsupported feature type: {feature_name}')
-        
-        plt.savefig(f'visualizations/extracted_audio_data/{filename}_{feature_name.lower()}.png')
-        plt.close()
-
-    def plot_1d_feature(self, feature, feature_name, filename):
+    def plot_feature(self, feature_mean, feature_std, feature_name, filename):
         plt.figure(figsize=(12, 6))
-        plt.plot(feature)
-        plt.title(f'{feature_name} - {filename}')
-        plt.xlabel('Time')
-        plt.ylabel(f'{feature_name} Values')
+        plt.errorbar(np.arange(len(feature_mean)), feature_mean, yerr=feature_std, fmt='-o', capsize=5)
+        plt.title(f'{feature_name} Mean and Std Dev - {filename}')
+        plt.xlabel(f'{feature_name} Coefficients')
+        plt.ylabel('Mean Value')
         plt.savefig(f'visualizations/extracted_audio_data/{filename}_{feature_name.lower()}.png')
         plt.close()
 
@@ -127,11 +95,16 @@ class AudioDataVisualizer:
             filename = row['filename']
 
             # Extract features from the DataFrame
-            mfccs = row['mfcc']
-            chroma = row['chroma']
-            mel = row['mel']
-            contrast = row['contrast']
-            tonnetz = row['tonnetz']
+            mfcc_mean = row['mfcc_mean']
+            mfcc_std = row['mfcc_std']
+            chroma_mean = row['chroma_mean']
+            chroma_std = row['chroma_std']
+            mel_mean = row['mel_mean']
+            mel_std = row['mel_std']
+            contrast_mean = row['contrast_mean']
+            contrast_std = row['contrast_std']
+            tonnetz_mean = row['tonnetz_mean']
+            tonnetz_std = row['tonnetz_std']
             harmony_mean = row['harmony_mean']
             harmony_std = row['harmony_std']
             perceptr_mean = row['perceptr_mean']
@@ -139,18 +112,23 @@ class AudioDataVisualizer:
             tempo = row['tempo']
 
             # Convert features to numpy arrays if necessary for plotting
-            mfccs = np.array(mfccs)
-            chroma = np.array(chroma)
-            mel = np.array(mel)
-            contrast = np.array(contrast)
-            tonnetz = np.array(tonnetz)
+            mfcc_mean = np.array(mfcc_mean)
+            mfcc_std = np.array(mfcc_std)
+            chroma_mean = np.array(chroma_mean)
+            chroma_std = np.array(chroma_std)
+            mel_mean = np.array(mel_mean)
+            mel_std = np.array(mel_std)
+            contrast_mean = np.array(contrast_mean)
+            contrast_std = np.array(contrast_std)
+            tonnetz_mean = np.array(tonnetz_mean)
+            tonnetz_std = np.array(tonnetz_std)
 
             # Plot and save visualizations
-            self.plot_mfccs(mfccs, filename)
-            self.plot_feature(chroma, 'Chroma', filename)
-            self.plot_feature(mel, 'Mel', filename)
-            self.plot_feature(contrast, 'Contrast', filename)
-            self.plot_feature(tonnetz, 'Tonnetz', filename)
+            self.plot_mfccs(mfcc_mean, mfcc_std, filename)
+            self.plot_chroma(chroma_mean, chroma_std, filename)
+            self.plot_feature(mel_mean, mel_std, 'Mel', filename)
+            self.plot_feature(contrast_mean, contrast_std, 'Contrast', filename)
+            self.plot_feature(tonnetz_mean, tonnetz_std, 'Tonnetz', filename)
             
             # Plot scalar features
             self.plot_scalar_feature(harmony_mean, 'Harmony Mean', filename)

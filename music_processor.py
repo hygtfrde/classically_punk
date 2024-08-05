@@ -3,25 +3,34 @@ import pandas as pd
 import numpy as np
 import librosa
 
-
 genres_from_dataset = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
-columns_from_extracted_librosa_audio_data = ['filename', 'genre', 'mfcc', 'chroma', 'mel', 'contrast', 'tonnetz', 'harmony_mean', 'harmony_std', 'perceptr_mean', 'perceptr_std', 'tempo']
+columns_from_extracted_librosa_audio_data = [
+    'filename', 'genre', 'mfcc_mean', 'mfcc_std', 'chroma_mean', 'chroma_std',
+    'mel_mean', 'mel_std', 'contrast_mean', 'contrast_std', 'tonnetz_mean', 'tonnetz_std',
+    'harmony_mean', 'harmony_std', 'perceptr_mean', 'perceptr_std', 'tempo'
+]
 
 expected_types = {
     'filename': 'object',
     'genre': 'object',
-    'mfcc': 'object',  # Stored as lists or arrays
-    'chroma': 'object',  # Stored as lists or arrays
-    'mel': 'object',  # Stored as lists or arrays
-    'contrast': 'object',  # Stored as lists or arrays
-    'tonnetz': 'object',  # Stored as lists or arrays
+    'mfcc_mean': 'object',
+    'mfcc_std': 'object',
+    'chroma_mean': 'object',
+    'chroma_std': 'object',
+    'mel_mean': 'object',
+    'mel_std': 'object',
+    'contrast_mean': 'object',
+    'contrast_std': 'object',
+    'tonnetz_mean': 'object',
+    'tonnetz_std': 'object',
     'harmony_mean': 'float32',
     'harmony_std': 'float32',
     'perceptr_mean': 'float32',
     'perceptr_std': 'float32',
-    'tempo': 'object'  # Assuming it will be a single float value
+    'tempo': 'object'
 }
 
+df_output_dir = 'df_output'
 
 class MusicDataProcessor:
     def __init__(self, dataset_path: str, file_depth_limit: int, file_output_name: str):
@@ -31,62 +40,86 @@ class MusicDataProcessor:
         self.genres = genres_from_dataset
         self.data = pd.DataFrame(columns=columns_from_extracted_librosa_audio_data)
 
-    def extract_features(self, file_path, verbose=1, start_time=0, end_time=None):
+        if not os.path.exists(df_output_dir):
+            os.makedirs(df_output_dir)
+            print(f"Directory '{df_output_dir}' created.")
+        else:
+            print(f"Directory '{df_output_dir}' already exists.")
+            
+    def get_data(self):
+        self.data.to_csv(f'{df_output_dir}/test.csv', index=False)
+        return self.data
+
+    def extract_features(self, file_path, verbose='v'):
         try:
             y, sr = librosa.load(file_path, sr=None)
-            
-            # Define snippet boundaries
-            if end_time is None:
-                end_time = len(y) / sr  # Use full length if end_time is not specified
-            
-            # Convert times to sample indices
+            start_time = 0
+            end_time = 30  # Extract first 30 seconds
+
+            # Convert start and end times to sample indices
             start_sample = int(start_time * sr)
             end_sample = int(end_time * sr)
-            
-            # Extract snippet
+
+            # Ensure end_sample is within the length of y
+            end_sample = min(end_sample, len(y))
+
+            # Slice audio snippet
             y = y[start_sample:end_sample]
             
+            # Handle cases where y is too short
+            n_fft = 1024
+            if len(y) < n_fft:
+                n_fft = len(y)  # Adjust n_fft to the length of y
+
             # Extract features from the snippet
-            mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
-            chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-            mel = librosa.feature.melspectrogram(y=y, sr=sr)
-            contrast = librosa.feature.spectral_contrast(y=y, sr=sr)
+            mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=n_fft)
+            chroma = librosa.feature.chroma_stft(y=y, sr=sr, n_fft=n_fft)
+            mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft)
+            contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft)
             tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
             harmony = librosa.effects.harmonic(y)
             perceptr = librosa.effects.percussive(y)
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
 
-            # Extract Mean and StdDev from harmony and perceptr
+            # Extract Mean and StdDev for all features
+            mfcc_mean = np.mean(mfcc, axis=1).astype(np.float32)
+            mfcc_std = np.std(mfcc, axis=1).astype(np.float32)
+            chroma_mean = np.mean(chroma, axis=1).astype(np.float32)
+            chroma_std = np.std(chroma, axis=1).astype(np.float32)
+            mel_mean = np.mean(mel, axis=1).astype(np.float32)
+            mel_std = np.std(mel, axis=1).astype(np.float32)
+            contrast_mean = np.mean(contrast, axis=1).astype(np.float32)
+            contrast_std = np.std(contrast, axis=1).astype(np.float32)
+            tonnetz_mean = np.mean(tonnetz, axis=1).astype(np.float32)
+            tonnetz_std = np.std(tonnetz, axis=1).astype(np.float32)
             harmony_mean = np.mean(harmony).astype(np.float32)
             harmony_std = np.std(harmony).astype(np.float32)
             perceptr_mean = np.mean(perceptr).astype(np.float32)
             perceptr_std = np.std(perceptr).astype(np.float32)
 
-            # Debug output with increased precision
-            print(f"Harmony: Min={np.min(harmony):.10f}, Max={np.max(harmony):.10f}, Range={np.ptp(harmony):.10f}")
-            print(f"Perciptr: Min={np.min(perceptr):.10f}, Max={np.max(perceptr):.10f}, Range={np.ptp(perceptr):.10f}")
-
-            if verbose == 1:
+            if verbose == 'v':
                 print(f"EXTRACTING: {file_path} \n"
                     f"  y: {y.shape}, dtype: {y.dtype} \n"
                     f"  sr: {sr} \n"
-                    f"  mfcc: {mfcc.shape}, dtype: {mfcc.dtype} \n"
-                    f"  chroma: {chroma.shape}, dtype: {chroma.dtype} \n"
-                    f"  mel: {mel.shape}, dtype: {mel.dtype} \n"
-                    f"  contrast: {contrast.shape}, dtype: {contrast.dtype} \n"
-                    f"  tonnetz: {tonnetz.shape}, dtype: {tonnetz.dtype} \n"
+                    f"  mfcc_mean: {mfcc_mean.shape}, dtype: {mfcc_mean.dtype} \n"
+                    f"  chroma_mean: {chroma_mean.shape}, dtype: {chroma_mean.dtype} \n"
+                    f"  mel_mean: {mel_mean.shape}, dtype: {mel_mean.dtype} \n"
+                    f"  contrast_mean: {contrast_mean.shape}, dtype: {contrast_mean.dtype} \n"
+                    f"  tonnetz_mean: {tonnetz_mean.shape}, dtype: {tonnetz_mean.dtype} \n"
                     f"  harmony_mean: {harmony_mean:.10f}, dtype: {type(harmony_mean)} \n"
                     f"  harmony_std: {harmony_std:.10f}, dtype: {type(harmony_std)} \n"
                     f"  perceptr_mean: {perceptr_mean:.10f}, dtype: {type(perceptr_mean)} \n"
                     f"  perceptr_std: {perceptr_std:.10f}, dtype: {type(perceptr_std)} \n"
                     f"  tempo: {tempo}, dtype: {type(tempo)}")
-            return mfcc, chroma, mel, contrast, tonnetz, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo
+
+            return mfcc_mean, mfcc_std, chroma_mean, chroma_std, mel_mean, mel_std, contrast_mean, contrast_std, tonnetz_mean, tonnetz_std, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             return None
 
-  
+
+
     def load_data(self):
         all_data = []
         for genre in self.genres:
@@ -101,17 +134,22 @@ class MusicDataProcessor:
                 start_time = 0  # Start at beginning
                 end_time = 30   # Extract first 30 seconds of each file
                 
-                features = self.extract_features(file_path, 1, start_time, end_time)
+                features = self.extract_features(file_path, 'v')
                 if features is not None:
-                    mfcc, chroma, mel, contrast, tonnetz, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo = features
+                    mfcc_mean, mfcc_std, chroma_mean, chroma_std, mel_mean, mel_std, contrast_mean, contrast_std, tonnetz_mean, tonnetz_std, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo = features
                     all_data.append({
                         'filename': file,
                         'genre': genre,
-                        'mfcc': mfcc.tolist(),  # Convert arrays to lists if needed
-                        'chroma': chroma.tolist(),
-                        'mel': mel.tolist(),
-                        'contrast': contrast.tolist(),
-                        'tonnetz': tonnetz.tolist(),
+                        'mfcc_mean': mfcc_mean.tolist(),  # Convert arrays to lists if needed
+                        'mfcc_std': mfcc_std.tolist(),
+                        'chroma_mean': chroma_mean.tolist(),
+                        'chroma_std': chroma_std.tolist(),
+                        'mel_mean': mel_mean.tolist(),
+                        'mel_std': mel_std.tolist(),
+                        'contrast_mean': contrast_mean.tolist(),
+                        'contrast_std': contrast_std.tolist(),
+                        'tonnetz_mean': tonnetz_mean.tolist(),
+                        'tonnetz_std': tonnetz_std.tolist(),
                         'harmony_mean': harmony_mean,  # Store mean and std as separate values
                         'harmony_std': harmony_std,
                         'perceptr_mean': perceptr_mean,
@@ -121,9 +159,12 @@ class MusicDataProcessor:
                 counter += 1
 
         self.data = pd.DataFrame(all_data)
+        self.get_data()
         
-        validate_data_after_loading = self.validate_data()
-        print('Is data validated after loading? => ', validate_data_after_loading)
+        # VALIDATE AFTER LOADING
+        # validate_data_after_loading = self.validate_data()
+        # print('Is data validated after loading? => ', validate_data_after_loading)
+
 
     def validate_data(self):
         valid = True
@@ -142,50 +183,31 @@ class MusicDataProcessor:
             print(self.data[self.data.isnull().any(axis=1)])  # Display rows with missing values
 
         # Validate genre column
-        if not all(self.data['genre'].isin(self.genres)):
-            valid = False
-            print("Error: Data contains invalid genres.")
-            invalid_genres = self.data[~self.data['genre'].isin(self.genres)]['genre'].unique()
-            print(f"Invalid genres: {invalid_genres}")
-        
-        for column, expected_type in expected_types.items():
-            if self.data[column].dtype != expected_type:
+        if 'genre' in self.data.columns:
+            if not all(self.data['genre'].isin(self.genres)):
                 valid = False
-                print(f"Validation Error: Column '{column}' has type '{self.data[column].dtype}' but expected '{expected_type}'.")
-
-        return valid
-        
-    def coerce_data_types(self, df):
-        for column, expected_type in expected_types.items():
-            if column in df.columns:
-                try:
-                    if expected_type == 'object' and column == 'tempo':
-                        df[column] = df[column].apply(lambda x: np.array(x) if isinstance(x, str) else x)
-                    else:
-                        df[column] = df[column].astype(expected_type)
-                except ValueError as e:
-                    print(f"Error converting column {column} to {expected_type}: {e}")
-        return df
-
-    def get_data(self):
-        df_output_dir = 'df_output'
-        if not os.path.exists(df_output_dir):
-            os.makedirs(df_output_dir)
-            print(f"Directory '{df_output_dir}' created.")
+                print("Error: Data contains invalid genres.")
+                invalid_genres = self.data[~self.data['genre'].isin(self.genres)]['genre'].unique()
+                print(f"Invalid genres: {invalid_genres}")
         else:
-            print(f"Directory '{df_output_dir}' already exists.")
-        
-                
-        # self.data.to_excel(file_path, index=False)
-        # self.data.to_csv(f'{df_output_dir}/_default_data.csv', index=False)
-        # self.data.to_parquet(f'{df_output_dir}/_default_data.parquet', engine='fastparquet')
-        
-        # Save to CSV
-        # self.data = self.coerce_data_types(self.data)
-        self.data.to_csv(f'{df_output_dir}/test.csv', index=False)
+            valid = False
+            print("Error: 'genre' column is missing from the DataFrame.")
+
+        # Validate column data types
+        for column, expected_type in expected_types.items():
+            if column in self.data.columns:
+                if self.data[column].dtype != expected_type:
+                    valid = False
+                    print(f"Validation Error: Column '{column}' has type '{self.data[column].dtype}' but expected '{expected_type}'.")
+            else:
+                valid = False
+                print(f"Validation Error: Column '{column}' is missing from the DataFrame.")
+
         # Load from CSV
-        df_loaded = pd.read_csv(f'{df_output_dir}/test.csv')
-        # df_loaded = self.coerce_data_types(df_loaded)
+        if os.path.isfile(f'{df_output_dir}/test.csv'):
+            df_loaded = pd.read_csv(f'{df_output_dir}/test.csv')
+        else:
+            df_loaded = None
 
         # Check if DataFrames are equal
         print('CHECKING EQUAL self.data vs df_loaded ===========================> ', self.data.equals(df_loaded))
@@ -196,8 +218,8 @@ class MusicDataProcessor:
         print(df_loaded.info())
         print('===========================')
 
+        return valid
 
-        return self.data
     
     def debug_data(self):
         print("Original Data Types:")
