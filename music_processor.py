@@ -31,9 +31,22 @@ class MusicDataProcessor:
         self.genres = genres_from_dataset
         self.data = pd.DataFrame(columns=columns_from_extracted_librosa_audio_data)
 
-    def extract_features(self, file_path, verbose=1):
+    def extract_features(self, file_path, verbose=1, start_time=0, end_time=None):
         try:
             y, sr = librosa.load(file_path, sr=None)
+            
+            # Define snippet boundaries
+            if end_time is None:
+                end_time = len(y) / sr  # Use full length if end_time is not specified
+            
+            # Convert times to sample indices
+            start_sample = int(start_time * sr)
+            end_sample = int(end_time * sr)
+            
+            # Extract snippet
+            y = y[start_sample:end_sample]
+            
+            # Extract features from the snippet
             mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
             chroma = librosa.feature.chroma_stft(y=y, sr=sr)
             mel = librosa.feature.melspectrogram(y=y, sr=sr)
@@ -50,30 +63,30 @@ class MusicDataProcessor:
             perceptr_std = np.std(perceptr).astype(np.float32)
 
             # Debug output with increased precision
-            # np.set_printoptions(precision=10, suppress=True)  # Set precision and suppress scientific notation
             print(f"Harmony: Min={np.min(harmony):.10f}, Max={np.max(harmony):.10f}, Range={np.ptp(harmony):.10f}")
             print(f"Perciptr: Min={np.min(perceptr):.10f}, Max={np.max(perceptr):.10f}, Range={np.ptp(perceptr):.10f}")
 
             if verbose == 1:
                 print(f"EXTRACTING: {file_path} \n"
-                      f"  y: {y.shape}, dtype: {y.dtype} \n"
-                      f"  sr: {sr} \n"
-                      f"  mfcc: {mfcc.shape}, dtype: {mfcc.dtype} \n"
-                      f"  chroma: {chroma.shape}, dtype: {chroma.dtype} \n"
-                      f"  mel: {mel.shape}, dtype: {mel.dtype} \n"
-                      f"  contrast: {contrast.shape}, dtype: {contrast.dtype} \n"
-                      f"  tonnetz: {tonnetz.shape}, dtype: {tonnetz.dtype} \n"
-                      f"  harmony_mean: {harmony_mean:.10f}, dtype: {type(harmony_mean)} \n"
-                      f"  harmony_std: {harmony_std:.10f}, dtype: {type(harmony_std)} \n"
-                      f"  perceptr_mean: {perceptr_mean:.10f}, dtype: {type(perceptr_mean)} \n"
-                      f"  perceptr_std: {perceptr_std:.10f}, dtype: {type(perceptr_std)} \n"
-                      f"  tempo: {tempo}, dtype: {type(tempo)}")
+                    f"  y: {y.shape}, dtype: {y.dtype} \n"
+                    f"  sr: {sr} \n"
+                    f"  mfcc: {mfcc.shape}, dtype: {mfcc.dtype} \n"
+                    f"  chroma: {chroma.shape}, dtype: {chroma.dtype} \n"
+                    f"  mel: {mel.shape}, dtype: {mel.dtype} \n"
+                    f"  contrast: {contrast.shape}, dtype: {contrast.dtype} \n"
+                    f"  tonnetz: {tonnetz.shape}, dtype: {tonnetz.dtype} \n"
+                    f"  harmony_mean: {harmony_mean:.10f}, dtype: {type(harmony_mean)} \n"
+                    f"  harmony_std: {harmony_std:.10f}, dtype: {type(harmony_std)} \n"
+                    f"  perceptr_mean: {perceptr_mean:.10f}, dtype: {type(perceptr_mean)} \n"
+                    f"  perceptr_std: {perceptr_std:.10f}, dtype: {type(perceptr_std)} \n"
+                    f"  tempo: {tempo}, dtype: {type(tempo)}")
             return mfcc, chroma, mel, contrast, tonnetz, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             return None
-        
+
+  
     def load_data(self):
         all_data = []
         for genre in self.genres:
@@ -83,7 +96,12 @@ class MusicDataProcessor:
                 if counter >= self.file_depth_limit:
                     break
                 file_path = os.path.join(genre_dir, file)
-                features = self.extract_features(file_path, 1)
+                
+                # Define snippet start and end times (in seconds)
+                start_time = 0  # Start at beginning
+                end_time = 30   # Extract first 30 seconds of each file
+                
+                features = self.extract_features(file_path, 1, start_time, end_time)
                 if features is not None:
                     mfcc, chroma, mel, contrast, tonnetz, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo = features
                     all_data.append({
@@ -136,7 +154,7 @@ class MusicDataProcessor:
                 print(f"Validation Error: Column '{column}' has type '{self.data[column].dtype}' but expected '{expected_type}'.")
 
         return valid
-    
+        
     def coerce_data_types(self, df):
         for column, expected_type in expected_types.items():
             if column in df.columns:

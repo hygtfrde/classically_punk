@@ -77,8 +77,8 @@ def prompt_for_gpu():
 # ------------------------------- MAIN -------------------------------
 def main():
     print("Configure the following options:")
-    process_data = get_user_input("Do you want to process and visualize data? (Y/N): ", default_value=True)
-    # visualize_data = get_user_input("Do you want to visualize data? (Y/N): ", default_value=True)
+    process_data = get_user_input("Do you want to process the data? (Y/N): ", default_value=True)
+    visualize_data = get_user_input("Do you want to visualize data? (Y/N): ", default_value=True)
     train_model = get_user_input("Do you want to train the model? (Y/N): ", default_value=True)
     predict_genre = get_user_input("Do you want to predict genre? (Y/N): ", default_value=True)
     
@@ -97,28 +97,27 @@ def main():
         print("Getting data...")
         music_data = genre_classifier.get_data()
         print('Music Data for Processor: \n', music_data)
-        visualizer = AudioDataVisualizer(music_data)
-        print("Plotting data...")
-        visualizer.visualize(1)
+        
     else: print('Skipping Data Processing')
     
     
     # ------------------------------- AudioDataVisualizer
-    # if visualize_data:
-    #     if music_data is None:
-    #         print('Using Default DF for music data')
-    #         default_csv_file_path = 'df_output/_default_data.parquet'
-    #         if not os.path.exists(default_csv_file_path):
-    #             print(f"Default DF file {default_csv_file_path} does not exist. Aborting.")
-    #             return
-    #         else:
-    #             music_data = pd.read_parquet(default_csv_file_path, engine='fastparquet')
-    #             print(f'Music Data for Visualizer: \n', music_data)
+    if visualize_data:
+        if music_data is None:
+            print('No currently processed data. Using Default DF for music data')
+            default_csv_file_path = 'df_output/test.csv'
+            if not os.path.exists(default_csv_file_path):
+                print(f"Default DF file {default_csv_file_path} does not exist. Aborting.")
+                return
+            else:
+                music_data = pd.read_csv(default_csv_file_path, engine='python')
+                print(f'Music Data for Visualizer: \n', music_data)
         
-    #     visualizer = AudioDataVisualizer(music_data)
-    #     visualizer.visualize(1)
-    # else:
-    #     print('Skipping Data Visualization')
+        visualizer = AudioDataVisualizer(music_data)
+        print("Plotting data...")
+        visualizer.visualize(1)
+    else:
+        print('Skipping Data Visualization')
 
 
     # ------------------------------- MusicGenreClassifier
