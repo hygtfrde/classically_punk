@@ -50,14 +50,14 @@ class MusicDataProcessor:
         self.data.to_csv(f'{df_output_dir}/test.csv', index=False)
         return self.data
 
-    def extract_features(self, file_path, verbose='v'):
+
+    def extract_features(self, file_path, verbose='v', extract_raw=False):
         try:
             y, sr = librosa.load(file_path, sr=None)
             y = y[:min(int(30 * sr), len(y))]  # Extract first 30 seconds or less
 
             n_fft = min(1024, len(y))  # Ensure n_fft is not greater than the length of y
 
-            # Define a function to extract mean and std
             def feature_stats(feature):
                 return np.mean(feature, axis=1).astype(np.float32), np.std(feature, axis=1).astype(np.float32)
 
@@ -70,6 +70,18 @@ class MusicDataProcessor:
             harmony = librosa.effects.harmonic(y)
             perceptr = librosa.effects.percussive(y)
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+            
+            if extract_raw:
+                return {
+                    'mfcc': mfcc,
+                    'chroma': chroma,
+                    'mel': mel,
+                    'contrast': contrast,
+                    'tonnetz': tonnetz,
+                    'harmony': harmony,
+                    'perceptr': perceptr,
+                    'tempo': tempo
+                }
 
             # Extract Mean and StdDev for all features
             mfcc_mean, mfcc_std = feature_stats(mfcc)
@@ -96,16 +108,6 @@ class MusicDataProcessor:
                     f"  tempo: {tempo}, dtype: {type(tempo)}")
 
             return {
-                'mfcc': mfcc,
-                'chroma': chroma,
-                'mel': mel,
-                'contrast': contrast,
-                'tonnetz': tonnetz,
-                'harmony_mean': harmony_mean,
-                'harmony_std': harmony_std,
-                'perceptr_mean': perceptr_mean,
-                'perceptr_std': perceptr_std,
-                'tempo': tempo,
                 'mfcc_mean': mfcc_mean,
                 'mfcc_std': mfcc_std,
                 'chroma_mean': chroma_mean,
@@ -115,7 +117,12 @@ class MusicDataProcessor:
                 'contrast_mean': contrast_mean,
                 'contrast_std': contrast_std,
                 'tonnetz_mean': tonnetz_mean,
-                'tonnetz_std': tonnetz_std
+                'tonnetz_std': tonnetz_std,
+                'harmony_mean': harmony_mean,
+                'harmony_std': harmony_std,
+                'perceptr_mean': perceptr_mean,
+                'perceptr_std': perceptr_std,
+                'tempo': tempo
             }
 
         except Exception as e:
@@ -140,17 +147,17 @@ class MusicDataProcessor:
                     all_data.append({
                         'filename': file,
                         'genre': genre,
-                        'mfcc_mean': features['mfcc_mean'].tolist(),  # Convert arrays to lists if needed
-                        'mfcc_std': features['mfcc_std'].tolist(),
-                        'chroma_mean': features['chroma_mean'].tolist(),
-                        'chroma_std': features['chroma_std'].tolist(),
-                        'mel_mean': features['mel_mean'].tolist(),
-                        'mel_std': features['mel_std'].tolist(),
-                        'contrast_mean': features['contrast_mean'].tolist(),
-                        'contrast_std': features['contrast_std'].tolist(),
-                        'tonnetz_mean': features['tonnetz_mean'].tolist(),
-                        'tonnetz_std': features['tonnetz_std'].tolist(),
-                        'harmony_mean': features['harmony_mean'],  # Store mean and std as separate values
+                        'mfcc_mean': features['mfcc_mean'],
+                        'mfcc_std': features['mfcc_std'],
+                        'chroma_mean': features['chroma_mean'],
+                        'chroma_std': features['chroma_std'],
+                        'mel_mean': features['mel_mean'],
+                        'mel_std': features['mel_std'],
+                        'contrast_mean': features['contrast_mean'],
+                        'contrast_std': features['contrast_std'],
+                        'tonnetz_mean': features['tonnetz_mean'],
+                        'tonnetz_std': features['tonnetz_std'],
+                        'harmony_mean': features['harmony_mean'],
                         'harmony_std': features['harmony_std'],
                         'perceptr_mean': features['perceptr_mean'],
                         'perceptr_std': features['perceptr_std'],
