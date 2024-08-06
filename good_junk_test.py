@@ -50,7 +50,7 @@ def main():
     dummy_path = 'df_output/dummy_music.csv' 
     moment_of_truth_path = 'df_output/test.csv'
     
-    X, y = read_csv_and_prepare_data(dummy_path)
+    X, y = read_csv_and_prepare_data(moment_of_truth_path)
     
     categories = y.unique()
     num_classes = len(categories)

@@ -1,7 +1,26 @@
 import os
+import ast
+
 import pandas as pd
 import numpy as np
 import librosa
+
+
+"""
+    DATA COLUMNS SUMMARY
+    - filename: The name of the audio file.
+    - genre: The genre of the audio file.
+    - mfcc: Mel-Frequency Cepstral Coefficients, which represent the short-term power spectrum of the audio file.
+    - chroma: Chroma features, which relate to the twelve different pitch classes.
+    - mel: Mel spectrogram, which represents the power of a signal in the mel scale frequencies.
+    - contrast: Spectral contrast, which measures the difference in amplitude between peaks and valleys in a sound spectrum.
+    - tonnetz: Tonnetz features, which capture harmonic and tonal properties.
+    - harmony: Harmonic features of the audio.
+    - perceptr: Perceptual features.
+    - tempo: The tempo of the audio file.
+"""
+
+
 
 genres_from_dataset = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
 columns_from_extracted_librosa_audio_data = [
@@ -51,7 +70,8 @@ class MusicDataProcessor:
         return self.data
 
 
-    def extract_features(self, file_path, verbose='v', extract_raw=False):
+
+    def extract_features(self, file_path, verbose='v', extract_raw_only=False):
         try:
             y, sr = librosa.load(file_path, sr=None)
             y = y[:min(int(30 * sr), len(y))]  # Extract first 30 seconds or less
@@ -59,7 +79,9 @@ class MusicDataProcessor:
             n_fft = min(1024, len(y))  # Ensure n_fft is not greater than the length of y
 
             def feature_stats(feature):
-                return np.mean(feature, axis=1).astype(np.float32), np.std(feature, axis=1).astype(np.float32)
+                mean = np.mean(feature).astype(np.float32)
+                std = np.std(feature).astype(np.float32)
+                return mean, std
 
             # Extract features
             mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=n_fft)
@@ -70,17 +92,17 @@ class MusicDataProcessor:
             harmony = librosa.effects.harmonic(y)
             perceptr = librosa.effects.percussive(y)
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-            
-            if extract_raw:
+
+            if extract_raw_only:
                 return {
-                    'mfcc': mfcc,
-                    'chroma': chroma,
-                    'mel': mel,
-                    'contrast': contrast,
-                    'tonnetz': tonnetz,
-                    'harmony': harmony,
-                    'perceptr': perceptr,
-                    'tempo': tempo
+                    'mfcc': mfcc.astype(np.float32).tolist(),
+                    'chroma': chroma.astype(np.float32).tolist(),
+                    'mel': mel.astype(np.float32).tolist(),
+                    'contrast': contrast.astype(np.float32).tolist(),
+                    'tonnetz': tonnetz.astype(np.float32).tolist(),
+                    'harmony': harmony.astype(np.float32).tolist(),
+                    'perceptr': perceptr.astype(np.float32).tolist(),
+                    'tempo': float(tempo)
                 }
 
             # Extract Mean and StdDev for all features
@@ -108,28 +130,26 @@ class MusicDataProcessor:
                     f"  tempo: {tempo}, dtype: {type(tempo)}")
 
             return {
-                'mfcc_mean': mfcc_mean,
-                'mfcc_std': mfcc_std,
-                'chroma_mean': chroma_mean,
-                'chroma_std': chroma_std,
-                'mel_mean': mel_mean,
-                'mel_std': mel_std,
-                'contrast_mean': contrast_mean,
-                'contrast_std': contrast_std,
-                'tonnetz_mean': tonnetz_mean,
-                'tonnetz_std': tonnetz_std,
+                'mfcc_mean': mfcc_mean.tolist(),
+                'mfcc_std': mfcc_std.tolist(),
+                'chroma_mean': chroma_mean.tolist(),
+                'chroma_std': chroma_std.tolist(),
+                'mel_mean': mel_mean.tolist(),
+                'mel_std': mel_std.tolist(),
+                'contrast_mean': contrast_mean.tolist(),
+                'contrast_std': contrast_std.tolist(),
+                'tonnetz_mean': tonnetz_mean.tolist(),
+                'tonnetz_std': tonnetz_std.tolist(),
                 'harmony_mean': harmony_mean,
                 'harmony_std': harmony_std,
                 'perceptr_mean': perceptr_mean,
                 'perceptr_std': perceptr_std,
-                'tempo': tempo
+                'tempo': float(tempo)
             }
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             return None
-
-
 
 
     def load_data(self):
