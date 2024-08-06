@@ -20,19 +20,7 @@ from audio_vizualizer import AudioDataVisualizer
 from music_processor import MusicDataProcessor
 from genre_classifier_model import MusicGenreClassifier
 
-"""
-    DATA COLUMNS SUMMARY
-    - filename: The name of the audio file.
-    - genre: The genre of the audio file.
-    - mfcc: Mel-Frequency Cepstral Coefficients, which represent the short-term power spectrum of the audio file.
-    - chroma: Chroma features, which relate to the twelve different pitch classes.
-    - mel: Mel spectrogram, which represents the power of a signal in the mel scale frequencies.
-    - contrast: Spectral contrast, which measures the difference in amplitude between peaks and valleys in a sound spectrum.
-    - tonnetz: Tonnetz features, which capture harmonic and tonal properties.
-    - harmony: Harmonic features of the audio.
-    - perceptr: Perceptual features.
-    - tempo: The tempo of the audio file.
-"""
+
 
 # ------------------------------- GLOBAL VARS
 test_audio_file_1 = 'genres/blues/blues.00000.wav'
