@@ -85,6 +85,7 @@ def main():
     
     # ------------------------------- MusicDataProcessor
     music_data = None
+    default_csv_file_path = 'df_output/test.csv'
     if process_data:
         print(f"{BLUE}Begin Data Processing{RESET}")
         dataset_path = 'genres'
@@ -105,7 +106,6 @@ def main():
     if visualize_data:
         if music_data is None:
             print('No currently processed data. Using Default DF for music data')
-            default_csv_file_path = 'df_output/test.csv'
             if not os.path.exists(default_csv_file_path):
                 print(f"Default DF file {default_csv_file_path} does not exist. Aborting.")
                 return
@@ -125,9 +125,8 @@ def main():
         prompt_for_gpu()
         print(f"{BLUE}Begin Model Training{RESET}")
 
-        # static_df = pd.read_excel('df_output/just_1_file_genres_df.xlsx')
-        # print(static_df['mfcc'].head())
-        # print(static_df['chroma'].head())
+        if music_data is None:
+            music_data = pd.read_csv(default_csv_file_path)
         
         classifier = MusicGenreClassifier(music_data)
         X_scaled, y_encoded = classifier.prepare_data()
