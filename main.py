@@ -128,7 +128,14 @@ def main():
         if music_data is None:
             music_data = pd.read_csv(default_csv_file_path)
         
-        classifier = MusicGenreClassifier(music_data)
+        
+        # TEST DUMMY DF
+        dummy_path = 'df_output/dummy_music.csv'
+        dummy = pd.read_csv(dummy_path)
+        print(dummy.info())
+        print(dummy.head())
+        
+        classifier = MusicGenreClassifier(dummy)
         X_scaled, y_encoded = classifier.prepare_data()
         X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
         classifier.train(X_train, y_train, X_test, y_test)

@@ -53,25 +53,15 @@ class MusicDataProcessor:
     def extract_features(self, file_path, verbose='v'):
         try:
             y, sr = librosa.load(file_path, sr=None)
-            start_time = 0
-            end_time = 30  # Extract first 30 seconds
+            y = y[:min(int(30 * sr), len(y))]  # Extract first 30 seconds or less
 
-            # Convert start and end times to sample indices
-            start_sample = int(start_time * sr)
-            end_sample = int(end_time * sr)
+            n_fft = min(1024, len(y))  # Ensure n_fft is not greater than the length of y
 
-            # Ensure end_sample is within the length of y
-            end_sample = min(end_sample, len(y))
+            # Define a function to extract mean and std
+            def feature_stats(feature):
+                return np.mean(feature, axis=1).astype(np.float32), np.std(feature, axis=1).astype(np.float32)
 
-            # Slice audio snippet
-            y = y[start_sample:end_sample]
-            
-            # Handle cases where y is too short
-            n_fft = 1024
-            if len(y) < n_fft:
-                n_fft = len(y)  # Adjust n_fft to the length of y
-
-            # Extract features from the snippet
+            # Extract features
             mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=n_fft)
             chroma = librosa.feature.chroma_stft(y=y, sr=sr, n_fft=n_fft)
             mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft)
@@ -82,20 +72,13 @@ class MusicDataProcessor:
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
 
             # Extract Mean and StdDev for all features
-            mfcc_mean = np.mean(mfcc, axis=1).astype(np.float32)
-            mfcc_std = np.std(mfcc, axis=1).astype(np.float32)
-            chroma_mean = np.mean(chroma, axis=1).astype(np.float32)
-            chroma_std = np.std(chroma, axis=1).astype(np.float32)
-            mel_mean = np.mean(mel, axis=1).astype(np.float32)
-            mel_std = np.std(mel, axis=1).astype(np.float32)
-            contrast_mean = np.mean(contrast, axis=1).astype(np.float32)
-            contrast_std = np.std(contrast, axis=1).astype(np.float32)
-            tonnetz_mean = np.mean(tonnetz, axis=1).astype(np.float32)
-            tonnetz_std = np.std(tonnetz, axis=1).astype(np.float32)
-            harmony_mean = np.mean(harmony).astype(np.float32)
-            harmony_std = np.std(harmony).astype(np.float32)
-            perceptr_mean = np.mean(perceptr).astype(np.float32)
-            perceptr_std = np.std(perceptr).astype(np.float32)
+            mfcc_mean, mfcc_std = feature_stats(mfcc)
+            chroma_mean, chroma_std = feature_stats(chroma)
+            mel_mean, mel_std = feature_stats(mel)
+            contrast_mean, contrast_std = feature_stats(contrast)
+            tonnetz_mean, tonnetz_std = feature_stats(tonnetz)
+            harmony_mean, harmony_std = np.mean(harmony).astype(np.float32), np.std(harmony).astype(np.float32)
+            perceptr_mean, perceptr_std = np.mean(perceptr).astype(np.float32), np.std(perceptr).astype(np.float32)
 
             if verbose == 'v':
                 print(f"EXTRACTING: {file_path} \n"
@@ -112,11 +95,33 @@ class MusicDataProcessor:
                     f"  perceptr_std: {perceptr_std:.10f}, dtype: {type(perceptr_std)} \n"
                     f"  tempo: {tempo}, dtype: {type(tempo)}")
 
-            return mfcc_mean, mfcc_std, chroma_mean, chroma_std, mel_mean, mel_std, contrast_mean, contrast_std, tonnetz_mean, tonnetz_std, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo
+            return {
+                'mfcc': mfcc,
+                'chroma': chroma,
+                'mel': mel,
+                'contrast': contrast,
+                'tonnetz': tonnetz,
+                'harmony_mean': harmony_mean,
+                'harmony_std': harmony_std,
+                'perceptr_mean': perceptr_mean,
+                'perceptr_std': perceptr_std,
+                'tempo': tempo,
+                'mfcc_mean': mfcc_mean,
+                'mfcc_std': mfcc_std,
+                'chroma_mean': chroma_mean,
+                'chroma_std': chroma_std,
+                'mel_mean': mel_mean,
+                'mel_std': mel_std,
+                'contrast_mean': contrast_mean,
+                'contrast_std': contrast_std,
+                'tonnetz_mean': tonnetz_mean,
+                'tonnetz_std': tonnetz_std
+            }
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             return None
+
 
 
 
@@ -130,31 +135,26 @@ class MusicDataProcessor:
                     break
                 file_path = os.path.join(genre_dir, file)
                 
-                # Define snippet start and end times (in seconds)
-                start_time = 0  # Start at beginning
-                end_time = 30   # Extract first 30 seconds of each file
-                
                 features = self.extract_features(file_path, 'v')
                 if features is not None:
-                    mfcc_mean, mfcc_std, chroma_mean, chroma_std, mel_mean, mel_std, contrast_mean, contrast_std, tonnetz_mean, tonnetz_std, harmony_mean, harmony_std, perceptr_mean, perceptr_std, tempo = features
                     all_data.append({
                         'filename': file,
                         'genre': genre,
-                        'mfcc_mean': mfcc_mean.tolist(),  # Convert arrays to lists if needed
-                        'mfcc_std': mfcc_std.tolist(),
-                        'chroma_mean': chroma_mean.tolist(),
-                        'chroma_std': chroma_std.tolist(),
-                        'mel_mean': mel_mean.tolist(),
-                        'mel_std': mel_std.tolist(),
-                        'contrast_mean': contrast_mean.tolist(),
-                        'contrast_std': contrast_std.tolist(),
-                        'tonnetz_mean': tonnetz_mean.tolist(),
-                        'tonnetz_std': tonnetz_std.tolist(),
-                        'harmony_mean': harmony_mean,  # Store mean and std as separate values
-                        'harmony_std': harmony_std,
-                        'perceptr_mean': perceptr_mean,
-                        'perceptr_std': perceptr_std,
-                        'tempo': tempo
+                        'mfcc_mean': features['mfcc_mean'].tolist(),  # Convert arrays to lists if needed
+                        'mfcc_std': features['mfcc_std'].tolist(),
+                        'chroma_mean': features['chroma_mean'].tolist(),
+                        'chroma_std': features['chroma_std'].tolist(),
+                        'mel_mean': features['mel_mean'].tolist(),
+                        'mel_std': features['mel_std'].tolist(),
+                        'contrast_mean': features['contrast_mean'].tolist(),
+                        'contrast_std': features['contrast_std'].tolist(),
+                        'tonnetz_mean': features['tonnetz_mean'].tolist(),
+                        'tonnetz_std': features['tonnetz_std'].tolist(),
+                        'harmony_mean': features['harmony_mean'],  # Store mean and std as separate values
+                        'harmony_std': features['harmony_std'],
+                        'perceptr_mean': features['perceptr_mean'],
+                        'perceptr_std': features['perceptr_std'],
+                        'tempo': features['tempo']
                     })
                 counter += 1
 
