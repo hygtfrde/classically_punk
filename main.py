@@ -9,7 +9,7 @@ from scipy.signal import spectrogram
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-# from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelBinarizer, StandardScaler, OneHotEncoder
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 # from tensorflow.keras.models import Sequential
@@ -127,19 +127,34 @@ def main():
 
         if music_data is None:
             music_data = pd.read_csv(default_csv_file_path)
-        
-        
-        # TEST DUMMY DF
-        dummy_path = 'df_output/dummy_music.csv'
-        dummy = pd.read_csv(dummy_path)
-        print(dummy.info())
-        print(dummy.head())
-        
-        classifier = MusicGenreClassifier(dummy)
-        X_scaled, y_encoded = classifier.prepare_data()
+            
+        # Load the data
+        dummy_data = pd.read_csv('df_output/dummy_music.csv')
+        # Drop non-numeric columns
+        X = dummy_data.drop(columns=['filename', 'genre'])
+        # Extract target labels
+        y = dummy_data['genre']
+        # One-hot encode the target labels
+        encoder = LabelBinarizer()
+        y_encoded = encoder.fit_transform(y)
+        # Scale the feature matrix
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        # Split the data into training and testing sets
         X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
+        # Define the feature dimension and genres
+        feature_dim = X_scaled.shape[1]
+        genres = encoder.classes_  # Automatically get genres from encoder
+        # Initialize and train the classifier
+        classifier = MusicGenreClassifier(feature_dim, genres)
         classifier.train(X_train, y_train, X_test, y_test)
         classifier.evaluate(X_test, y_test)
+        
+        # classifier = MusicGenreClassifier(dummy_data)
+        # X_scaled, y_encoded = classifier.prepare_data()
+        # X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
+        # classifier.train(X_train, y_train, X_test, y_test)
+        # classifier.evaluate(X_test, y_test)
     else: print('Skipping Model Training')
 
     # ------------------------------- Predict a Genre
