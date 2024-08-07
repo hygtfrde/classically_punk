@@ -4,7 +4,7 @@ import pandas as pd
 import librosa
 
 from audio_vizualizer import AudioDataVisualizer
-from music_processor import MusicDataProcessor
+from aggregated_music_processor import MusicDataProcessor
 
 from helpers import get_user_input
 
