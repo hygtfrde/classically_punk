@@ -2,6 +2,8 @@ logs/*
 blob*
 _blob*
 
+__pycache__
+
 scripts/.DS_Store
 
 visualizations/*
