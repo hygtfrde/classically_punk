@@ -80,13 +80,6 @@ class AudioDataVisualizer:
     # -------------------------------
 
     def visualize(self, rows_visualized_per_genre):
-        # Plot Test Audio File Waveform and Spectogram
-        test_audio_file_1 = 'genres/blues/blues.00000.wav'
-        audio_data, sample_rate = librosa.load(test_audio_file_1, sr=None)
-        self.plot_waveform(audio_data, sample_rate, 'test_blues_00000')
-        self.plot_spectrogram(audio_data, sample_rate, 'test_blues_00000')
-        
-        # Plots for each genre limited by rows_visualized_per_genre
         visualized_counts = {}
         for idx, row in self.df.iterrows():
             genre = row['genre']
