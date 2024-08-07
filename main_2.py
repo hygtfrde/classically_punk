@@ -6,6 +6,10 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Input
 
+GREEN = '\033[32m'
+RED = '\033[31m'
+RESET = '\033[0m'
+
 def read_csv_and_split_df(file_path):
     df = pd.read_csv(file_path)
     print('DataFrame Head:\n', df.head())
@@ -61,9 +65,6 @@ def predict(model, encoder, scaler, feature_inputs):
 
 
 def evaluate_all_rows(model, X, y, encoder, scaler):
-    GREEN = '\033[32m'
-    RED = '\033[31m'
-    RESET = '\033[0m'
     correct_count = 0
     total_count = len(X)
     
@@ -124,41 +125,53 @@ def main():
         # Make Predictions with user input for row or song to test
         while True:
             try:
-                # Prompt user for row number
-                row_num = int(input(f"Enter a row number (0 to {len(X) - 1}): "))
-                if row_num < 0 or row_num >= len(X):
-                    raise ValueError("Row number is out of bounds.")
-                
-                # Print the selected row
-                selected_row = X.iloc[row_num]
-                selected_genre = y.iloc[row_num]
-                print(f"Selected row:\n{selected_row}")
-                print(f"Selected genre:\n{selected_genre}")
-                
-                # Confirm to use this row for prediction
-                confirm = input("Do you want to use this song data for prediction? (Y/N), or Q to quit: ").strip().upper()
-                if confirm == 'Y':
-                    # Make prediction
-                    example_feature_inputs = selected_row.values
-                    predicted_class = predict(model, encoder, scaler, example_feature_inputs)
-                    print(f"Predicted class: {predicted_class}")
-                    continue
-                elif confirm == 'N':
-                    continue  # Repeat the row selection
-                elif confirm == 'Q':
-                    break
+                prompt_for_start_predictor = input("Would you like to predict a genre (Y/N)? ").strip().upper()
+                if prompt_for_start_predictor == 'Y':
+                    row_input = input(f"Enter a row number (0 to {len(X) - 1}), or Q to skip: ").strip().upper()
+                    if row_input == 'Q':
+                        break  # Exit the loop if the user wants to skip
+
+                    try:
+                        row_num = int(row_input)
+                        if row_num < 0 or row_num >= len(X):
+                            raise ValueError("Row number is out of bounds.")
+                    except ValueError as ve:
+                        print(f"Error: {ve}")
+                        continue  # Prompt user again if row number input is invalid
+
+                    # Print the selected row
+                    selected_row = X.iloc[row_num]
+                    selected_genre = y.iloc[row_num]
+                    print(f"Selected row:\n{selected_row}")
+                    print(f"Selected genre:\n{GREEN}{selected_genre}{RESET}")
+
+                    # Confirm to use this row for prediction
+                    confirm = input("Do you want to use this song data for prediction? (Y/N), or Q to quit: ").strip().upper()
+                    if confirm == 'Y':
+                        # Make prediction
+                        example_feature_inputs = selected_row.values
+                        predicted_class = predict(model, encoder, scaler, example_feature_inputs)
+                        print(f"Predicted class: {predicted_class}")
+                    elif confirm == 'Q':
+                        break  # Exit the loop if the user wants to quit
+                    elif confirm != 'N':
+                        print("Invalid input. Please enter Y or N, or use Q to quit.")
+                elif prompt_for_start_predictor == 'N':
+                    break  # Exit the loop if the user does not want to predict a genre
                 else:
-                    print("Invalid input. Please enter Y or N, or use Q to quit.")
-            except ValueError as ve:
-                print(f"Error: {ve}")
+                    print("Invalid input. Please enter Y or N.")
             except Exception as e:
                 print(f"An error occurred: {e}")
+
         
         # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
     
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+
 
 if __name__ == '__main__':
     main()
