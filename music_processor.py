@@ -66,7 +66,7 @@ class MusicDataProcessor:
             print(f"Directory '{df_output_dir}' already exists.")
             
     def get_data(self):
-        self.data.to_csv(f'{df_output_dir}/test.csv', index=False)
+        self.data.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
         return self.data
 
 
@@ -158,7 +158,7 @@ class MusicDataProcessor:
             counter = 0
             genre_dir = os.path.join(self.dataset_path, genre)
             for file in os.listdir(genre_dir):
-                if counter >= self.file_depth_limit:
+                if self.file_depth_limit and counter >= self.file_depth_limit:
                     break
                 file_path = os.path.join(genre_dir, file)
                 
