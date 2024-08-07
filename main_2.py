@@ -22,8 +22,6 @@ def prepare_data(X, y, categories):
     X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)  # Convert to DataFrame with feature names
     return X_scaled_df, y_encoded, encoder, scaler
 
-
-
 def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_classes):
     model = Sequential([
         Input(shape=(num_features,)),
@@ -36,14 +34,13 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
     history = model.fit(
         X_train, 
         y_train, 
-        epochs=10, 
+        epochs=100, 
         batch_size=32, 
         validation_data=(X_test, y_test),
         verbose=1
     )
     
     return model, history
-
 
 def predict(model, encoder, scaler, feature_inputs):
     # Convert feature_inputs to DataFrame
@@ -62,44 +59,42 @@ def predict(model, encoder, scaler, feature_inputs):
     return predicted_class
 
 
-def evaluate(model, X, y, encoder, scaler, num_rows=None):
-    if num_rows is None:
-        num_rows = len(X)  # Use all rows if num_rows is not specified
 
-    # Ensure num_rows does not exceed available rows
-    num_rows = min(num_rows, len(X))
+def evaluate_all_rows(model, X, y, encoder, scaler):
+    GREEN = '\033[32m'
+    RED = '\033[31m'
+    RESET = '\033[0m'
+    correct_count = 0
+    total_count = len(X)
     
-    # Prepare data for evaluation
-    X_evaluation = X.iloc[:num_rows] if isinstance(X, pd.DataFrame) else X[:num_rows]
-    y_true = y.iloc[:num_rows] if isinstance(y, pd.Series) else y[:num_rows]
+    for i in range(total_count):
+        # Extract feature inputs and true label
+        feature_inputs = X.iloc[i].values
+        true_label = y.iloc[i]
+        
+        # Make prediction
+        predicted_class = predict(model, encoder, scaler, feature_inputs)
+        
+        # Check if the prediction matches the true label
+        if predicted_class == true_label:
+            print(f"{GREEN}{predicted_class} is {true_label}{RESET}")
+            correct_count += 1
+        else:
+            print(f"{RED}{predicted_class} is NOT {true_label}{RESET}")
 
-    # Convert feature data to DataFrame if it's a numpy array
-    if isinstance(X_evaluation, np.ndarray):
-        X_evaluation_df = pd.DataFrame(X_evaluation, columns=scaler.feature_names_in_)
-    else:
-        X_evaluation_df = X_evaluation
-
-    # Scale the feature data
-    X_evaluation_scaled = scaler.transform(X_evaluation_df)
-    
-    # Predict using the model
-    y_pred_probs = model.predict(X_evaluation_scaled)
-    y_pred = np.argmax(y_pred_probs, axis=1)
-    
-    # Decode the predictions
-    y_pred_classes = encoder.categories_[0][y_pred]
-    
     # Calculate accuracy
-    correct = np.sum(y_pred_classes == y_true.values)
-    total = len(y_true)
-    accuracy = correct / total * 100
-    incorrect = total - correct
+    accuracy = (correct_count / total_count) * 100
+    incorrect_count = total_count - correct_count
     
-    print(f"Number of rows evaluated: {num_rows}")
+    print(f"Total rows evaluated: {total_count}")
     print(f"Accuracy: {accuracy:.2f}%")
-    print(f"Correct: {correct}, Incorrect: {incorrect}")
+    print(f"Correct: {correct_count}, Incorrect: {incorrect_count}")
 
-    return accuracy, correct, incorrect
+    return accuracy, correct_count, incorrect_count
+
+
+
+
 
 
 def main():
@@ -158,27 +153,12 @@ def main():
                 print(f"Error: {ve}")
             except Exception as e:
                 print(f"An error occurred: {e}")
-                
         
         # Evaluate model
-        while True:
-            try:
-                num_rows = input("Enter the number of rows to use for evaluation (or press Enter to use all rows): ")
-                num_rows = int(num_rows) if num_rows else None
-                
-                # Evaluate the model
-                evaluate(model, encoder, scaler, X_test, y_test, num_rows)
-                break  # Exit the loop after evaluation
-
-            except ValueError as ve:
-                print(f"Error: {ve}")
-            except Exception as e:
-                print(f"An error occurred: {e}")
+        evaluate_all_rows(model, X_scaled, y, encoder, scaler)
     
     except Exception as e:
         print(f"An error occurred: {e}")
-        
-        
 
 if __name__ == '__main__':
     main()
