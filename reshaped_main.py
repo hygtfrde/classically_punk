@@ -111,7 +111,7 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
 
 
 def main():
-    only_mfcc = 'df_output/only_mfcc_1.csv'
+    only_mfcc = 'df_output/only_mfcc_huge.csv'
     test_csv_path = 'df_output/test_1.csv'
     try:
         # Read and prepare data
@@ -159,8 +159,8 @@ def main():
                     print(f"Selected genre:\n{GREEN}{selected_genre}{RESET}")
 
                     # Confirm to use this row for prediction
-                    confirm = input("Do you want to use this song data for prediction? (Y/N), or Q to quit: ").strip().upper()
-                    if confirm == 'Y':
+                    confirm = input("Do you want to use this song data for prediction? (Y/N), Enter for Y, or Q to quit: ").strip().upper()
+                    if confirm in ('Y', ''):
                         # Make prediction
                         example_feature_inputs = selected_row.values
                         predicted_class = predict(model, encoder, scaler, example_feature_inputs)
