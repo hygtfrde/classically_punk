@@ -1,3 +1,5 @@
+import ast
+
 import tensorflow as tf
 import numpy as np
 import pandas as pd
@@ -10,13 +12,23 @@ GREEN = '\033[32m'
 RED = '\033[31m'
 RESET = '\033[0m'
 
-def read_csv_and_split_df(file_path):
-    df = pd.read_csv(file_path)
-    print('DataFrame Head:\n', df.head())
-    print('DataFrame Info:\n', df.info())
-    X = df.drop(columns=['filename', 'genre'])
-    y = df['genre']
+
+
+def convert_string_to_array(string):
+    try:
+        list_of_floats = ast.literal_eval(string)
+        return np.array(list_of_floats, dtype=float)  # Ensure float type
+    except Exception as e:
+        print(f"Error converting string to array: {e}")
+        return np.array([])
+
+
+def read_csv_and_split_df(csv_path):
+    df = pd.read_csv(csv_path)
+    X = df.drop(columns=['filename', 'genre'])  # Drop non-feature columns
+    y = df['genre']  # Target column
     return X, y
+
 
 def prepare_data(X, y, categories):
     encoder = OneHotEncoder(sparse_output=False, categories=[categories])
@@ -99,10 +111,11 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
 
 
 def main():
-    test_csv_path = 'df_output/reshaped_music_data.csv'
+    only_mfcc = 'df_output/only_mfcc_1.csv'
+    test_csv_path = 'df_output/test_1.csv'
     try:
         # Read and prepare data
-        X, y = read_csv_and_split_df(test_csv_path)
+        X, y = read_csv_and_split_df(only_mfcc)
         categories = y.unique()
         num_classes = len(categories)
         X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
@@ -161,14 +174,14 @@ def main():
                 else:
                     print("Invalid input. Please enter Y or N.")
             except Exception as e:
-                print(f"An error occurred: {e}")
+                print(f"An error occurred in prediction block: {e}")
 
         
         # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
     
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred in main block: {e}")
 
 
 
