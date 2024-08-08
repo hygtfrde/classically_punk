@@ -46,14 +46,13 @@ df_output_dir = 'df_output'
 
 
 class MusicDataProcessor:
-    def __init__(self, dataset_path: str, file_depth_limit: int, file_output_name: str, extract_raw_only: bool, verbose: str):
+    def __init__(self, dataset_path: str, file_depth_limit: int, file_output_name: str, extract_raw_only: bool):
         self.dataset_path = dataset_path
         self.file_depth_limit = file_depth_limit
         self.file_output_name = file_output_name
         self.genres = genres_from_dataset
         self.data = pd.DataFrame(columns=fundamental_features_cols)
         self.extract_raw_only = extract_raw_only
-        self.verbose = verbose
 
         if not os.path.exists(df_output_dir):
             os.makedirs(df_output_dir)
@@ -67,7 +66,7 @@ class MusicDataProcessor:
         return self.data
     
 
-    def extract_features(self, file_path):
+    def extract_features(self, file_path, verbose='v'):
         try:
             y, sr = librosa.load(file_path, sr=None)
 
@@ -90,33 +89,64 @@ class MusicDataProcessor:
                     'tonnetz': tonnetz
                 }
 
-            def compute_stats(features, name_prefix):
-                stats = {}
-                for i in range(features.shape[0]):
-                    feature_i = features[i, :]
-                    stats[f'{name_prefix}_{i+1}_mean'] = np.mean(feature_i)
-                    stats[f'{name_prefix}_{i+1}_stddev'] = np.std(feature_i)
-                    stats[f'{name_prefix}_{i+1}_var'] = np.var(feature_i)
-                    stats[f'{name_prefix}_{i+1}_min'] = np.min(feature_i)
-                    stats[f'{name_prefix}_{i+1}_max'] = np.max(feature_i)
-                return stats
+            mfcc_stats = {}
+            for i in range(13):
+                mfcc_i = mfcc[i, :]
+                mfcc_stats[f'mfcc_{i+1}_mean'] = np.mean(mfcc_i)
+                mfcc_stats[f'mfcc_{i+1}_stddev'] = np.std(mfcc_i)
+                mfcc_stats[f'mfcc_{i+1}_var'] = np.var(mfcc_i)
+                mfcc_stats[f'mfcc_{i+1}_min'] = np.min(mfcc_i)
+                mfcc_stats[f'mfcc_{i+1}_max'] = np.max(mfcc_i)
+            
+            chroma_stats = {}
+            num_chroma_features = chroma.shape[0]
+            num_chroma_frames = chroma.shape[1]
+            for i in range(min(13, num_chroma_features)):  # Avoid out-of-bounds error
+                chroma_i = chroma[i, :]
+                chroma_stats[f'chroma_{i+1}_mean'] = np.mean(chroma_i)
+                chroma_stats[f'chroma_{i+1}_stddev'] = np.std(chroma_i)
+                chroma_stats[f'chroma_{i+1}_var'] = np.var(chroma_i)
+                chroma_stats[f'chroma_{i+1}_min'] = np.min(chroma_i)
+                chroma_stats[f'chroma_{i+1}_max'] = np.max(chroma_i)
 
-            # Compute stats for each feature set
-            mfcc_stats = compute_stats(mfcc, 'mfcc')
-            chroma_stats = compute_stats(chroma, 'chroma')
-            mel_stats = compute_stats(mel, 'mel')
-            contrast_stats = compute_stats(contrast, 'contrast')
-            tonnetz_stats = compute_stats(tonnetz, 'tonnetz')
+            mel_stats = {}
+            num_mel_features = mel.shape[0]
+            for i in range(num_mel_features):
+                mel_i = mel[i, :]
+                mel_stats[f'mel_{i+1}_mean'] = np.mean(mel_i)
+                mel_stats[f'mel_{i+1}_stddev'] = np.std(mel_i)
+                mel_stats[f'mel_{i+1}_var'] = np.var(mel_i)
+                mel_stats[f'mel_{i+1}_min'] = np.min(mel_i)
+                mel_stats[f'mel_{i+1}_max'] = np.max(mel_i)
 
-            if self.verbose == 'v' or 'V':
+            contrast_stats = {}
+            num_contrast_features = contrast.shape[0]
+            for i in range(num_contrast_features):
+                contrast_i = contrast[i, :]
+                contrast_stats[f'contrast_{i+1}_mean'] = np.mean(contrast_i)
+                contrast_stats[f'contrast_{i+1}_stddev'] = np.std(contrast_i)
+                contrast_stats[f'contrast_{i+1}_var'] = np.var(contrast_i)
+                contrast_stats[f'contrast_{i+1}_min'] = np.min(contrast_i)
+                contrast_stats[f'contrast_{i+1}_max'] = np.max(contrast_i)
+
+            tonnetz_stats = {}
+            num_tonnetz_features = tonnetz.shape[0]
+            for i in range(num_tonnetz_features):
+                tonnetz_i = tonnetz[i, :]
+                tonnetz_stats[f'tonnetz_{i+1}_mean'] = np.mean(tonnetz_i)
+                tonnetz_stats[f'tonnetz_{i+1}_stddev'] = np.std(tonnetz_i)
+                tonnetz_stats[f'tonnetz_{i+1}_var'] = np.var(tonnetz_i)
+                tonnetz_stats[f'tonnetz_{i+1}_min'] = np.min(tonnetz_i)
+                tonnetz_stats[f'tonnetz_{i+1}_max'] = np.max(tonnetz_i)
+
+            if verbose == 'v':
                 print(f"EXTRACTING: mfcc_stats\n{mfcc_stats}")
                 print(f"EXTRACTING: chroma_stats\n{chroma_stats}")
                 print(f"EXTRACTING: mel_stats\n{mel_stats}")
                 print(f"EXTRACTING: contrast_stats\n{contrast_stats}")
                 print(f"EXTRACTING: tonnetz_stats\n{tonnetz_stats}")
 
-            all_stats = {**mfcc_stats, **chroma_stats, **mel_stats, **contrast_stats, **tonnetz_stats}
-            return all_stats
+            return {**mfcc_stats, **chroma_stats, **mel_stats, **contrast_stats, **tonnetz_stats}
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
@@ -130,6 +160,7 @@ class MusicDataProcessor:
             counter = 0
             genre_dir = os.path.join(self.dataset_path, genre)
             for file in os.listdir(genre_dir):
+                print(f'File number: {counter}')
                 if self.file_depth_limit and counter >= self.file_depth_limit:
                     break
                 file_path = os.path.join(genre_dir, file)
@@ -154,14 +185,14 @@ class MusicDataProcessor:
 def main():
     dataset_path = 'genres'  # Replace with the path to your audio dataset
     file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'all_songs_5_stat_sets'  # Name for the output CSV file
+    file_output_name = 'all_song_5_stats'  # Name for the output CSV file
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(
         dataset_path=dataset_path,
         file_output_name=file_output_name, 
         file_depth_limit=file_depth_limit,
-        extract_raw_only=True
+        extract_raw_only=None
     )
 
     # Load data
