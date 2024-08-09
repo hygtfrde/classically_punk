@@ -47,7 +47,7 @@ class MusicDataProcessor:
 
             
             means_df = pd.DataFrame([mfcc_means])
-            means_df.to_csv(f'{df_output_dir}/means_validations_{self.file_output_name}.csv', index=False)
+            means_df.to_csv(f'{df_output_dir}/validations_{self.file_output_name}.csv', index=False)
             
             return mfcc_means
 
@@ -67,7 +67,7 @@ class MusicDataProcessor:
             contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft)
             tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
             
-            if self.extract_raw_only is not None or False:
+            if self.extract_raw_only is not None and self.extract_raw_only:
                 # Save raw features to CSV for full inspection
                 np.savez(f'{df_output_dir}/raw_features_{self.file_output_name}.npz', mfcc=mfcc, chroma=chroma, mel=mel, contrast=contrast, tonnetz=tonnetz)
                 
