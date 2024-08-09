@@ -6,44 +6,13 @@ import numpy as np
 import librosa
 from sklearn.decomposition import PCA
 
-
-"""
-    DATA COLUMNS SUMMARY
-    - filename: The name of the audio file.
-    - genre: The genre of the audio file.
-    - mfcc: Mel-Frequency Cepstral Coefficients, which represent the short-term power spectrum of the audio file.
-    - chroma: Chroma features, which relate to the twelve different pitch classes.
-    - mel: Mel spectrogram, which represents the power of a signal in the mel scale frequencies.
-    - contrast: Spectral contrast, which measures the difference in amplitude between peaks and valleys in a sound spectrum.
-    - tonnetz: Tonnetz features, which capture harmonic and tonal properties.
-    - harmony: Harmonic features of the audio.
-    - perceptr: Perceptual features.
-    - tempo: The tempo of the audio file.
-"""
-
-
-
+# Constants
 genres_from_dataset = 'blues classical country disco hiphop jazz metal pop reggae rock'.split()
-
 fundamental_features_cols = [
-    'mfcc',         # Mel-Frequency Cepstral Coefficients
-    'chroma',       # Chroma Features
-    'mel',          # Mel Spectrogram
-    'contrast',     # Spectral Contrast
-    'tonnetz'       # Tonnetz Features
+    'mfcc', 'chroma', 'mel', 'contrast', 'tonnetz'
 ]
 
-expected_types_for_fundamental_features = {
-    'mfcc': 'float32',        # 2D numpy array (coefficients x frames)
-    'chroma': 'float32',      # 2D numpy array (pitch classes x frames)
-    'mel': 'float32',         # 2D numpy array (mel bands x frames)
-    'contrast': 'float32',    # 2D numpy array (bands x frames)
-    'tonnetz': 'float32'      # 2D numpy array (tonnetz features x frames)
-}
-
 df_output_dir = 'df_output'
-
-
 
 class MusicDataProcessor:
     def __init__(self, dataset_path: str, file_depth_limit: int, file_output_name: str, extract_raw_only: bool):
@@ -60,32 +29,23 @@ class MusicDataProcessor:
         else:
             print(f"Directory '{df_output_dir}' already exists.")
 
-
     def get_data(self):
         self.data.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
         return self.data
-
 
     def validate_stats(self, mfcc_array):
         try:
             if len(mfcc_array.shape) != 2:
                 raise ValueError("Input must be a 2D numpy array.")
             
-            # Initialize a dictionary to store MFCC means
             mfcc_means = {}
-
-            # Iterate over the first 13 MFCC coefficients
             for i in range(13):
-                if i < mfcc_array.shape[0]:
-                    mfcc_i = mfcc_array[i, :]
-                    mean_value = np.mean(mfcc_i)
-                    mfcc_means[f'mfcc_{i+1}_mean'] = mean_value
-                    print(f"MFCC {i+1} Mean: {mean_value}")
-                else:
-                    print(f"Warning: MFCC array has fewer than 13 sub-arrays. Computed means for {i} sub-arrays.")
-                    break
+                mfcc_i = mfcc_array[i, :]
+                mean_value = np.mean(mfcc_i)
+                mfcc_means[f'mfcc_{i+1}_mean'] = mean_value
+                print(f"MFCC {i+1} Mean: {mean_value}")
+
             
-            # Convert the dictionary to a DataFrame and save to CSV
             means_df = pd.DataFrame([mfcc_means])
             means_df.to_csv(f'{df_output_dir}/means_validations_{self.file_output_name}.csv', index=False)
             
@@ -94,7 +54,6 @@ class MusicDataProcessor:
         except Exception as e:
             print(f"Error in validate_stats: {e}")
             return None
-    
 
     def extract_features(self, file_path, verbose='v'):
         try:
@@ -108,7 +67,17 @@ class MusicDataProcessor:
             contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft)
             tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
             
-            if self.extract_raw_only is not None:
+            if self.extract_raw_only is not None or False:
+                # Save raw features to CSV for full inspection
+                np.savez(f'{df_output_dir}/raw_features_{self.file_output_name}.npz', mfcc=mfcc, chroma=chroma, mel=mel, contrast=contrast, tonnetz=tonnetz)
+                
+                if verbose == 'v':
+                    print(f"MFCC Shape: {mfcc.shape}")
+                    print(f"Chroma Shape: {chroma.shape}")
+                    print(f"Mel Shape: {mel.shape}")
+                    print(f"Contrast Shape: {contrast.shape}")
+                    print(f"Tonnetz Shape: {tonnetz.shape}")
+                
                 return {
                     'mfcc': mfcc,
                     'chroma': chroma,
@@ -183,8 +152,6 @@ class MusicDataProcessor:
             print(f"Error processing {file_path}: {e}")
             return None
 
-
-
     def load_data(self):
         all_data = []
         for genre in self.genres:
@@ -210,8 +177,6 @@ class MusicDataProcessor:
         self.data = pd.DataFrame(all_data)
         self.get_data()
 
-
-
 # ------------------------------- MAIN -------------------------------
 def main():
     dataset_path = 'genres'  # Replace with the path to your audio dataset
@@ -223,7 +188,7 @@ def main():
         dataset_path=dataset_path,
         file_output_name=file_output_name, 
         file_depth_limit=file_depth_limit,
-        extract_raw_only=True
+        extract_raw_only=None
     )
 
     # Load data
