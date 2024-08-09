@@ -35,6 +35,29 @@ class MusicDataProcessor:
         self.data.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
         return self.data
 
+    def compute_stats_and_measures(self, data, compute_kde: bool, compute_ecdf: bool):
+        # Compute basic statistics
+        stats_dict = {
+            'mean': np.mean(data),
+            'stddev': np.std(data),
+            'var': np.var(data),
+            'min': np.min(data),
+            'max': np.max(data),
+            'mad': stats.median_abs_deviation(data)
+        }
+        
+        # Compute ECDF
+        if compute_ecdf:
+            sorted_data, ecdf = np.sort(data), np.arange(1, len(data) + 1) / len(data)
+            stats_dict['ecdf_values'] = sorted_data.tolist()
+            stats_dict['ecdf_proportions'] = ecdf.tolist()
+        
+        # Compute KDE
+        if compute_kde:
+            kde = stats.gaussian_kde(data)
+            stats_dict['kde'] = kde
+        
+        return stats_dict
 
     def extract_features(self, file_path, verbose='v'):
         try:
@@ -42,149 +65,55 @@ class MusicDataProcessor:
             n_fft = min(1024, len(y))
 
             # Extract features
-            mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=n_fft)
-            chroma = librosa.feature.chroma_stft(y=y, sr=sr, n_fft=n_fft)
-            mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft)
-            contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft)
-            tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
-            spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)
-            spectral_flatness = librosa.feature.spectral_flatness(y=y)
-            spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-            zero_crossing_rate = librosa.feature.zero_crossing_rate(y=y)
+            features = {
+                'mfcc': librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=n_fft),
+                'chroma': librosa.feature.chroma_stft(y=y, sr=sr, n_fft=n_fft),
+                'mel': librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft),
+                'contrast': librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft),
+                'tonnetz': librosa.feature.tonnetz(y=y, sr=sr),
+                'spectral_bandwidth': librosa.feature.spectral_bandwidth(y=y, sr=sr),
+                'spectral_flatness': librosa.feature.spectral_flatness(y=y),
+                'spectral_centroid': librosa.feature.spectral_centroid(y=y, sr=sr),
+                'zero_crossing_rate': librosa.feature.zero_crossing_rate(y=y),
+                'harmony': librosa.effects.harmonic(y),
+                'perceptr': librosa.effects.percussive(y),
+                'tempo': librosa.beat.beat_track(y=y, sr=sr)[0]
+            }
             
             if self.extract_raw_only is not None and self.extract_raw_only:
-                # Save raw features to CSV for full inspection
-                np.savez(f'{df_output_dir}/raw_features_{self.file_output_name}.npz', mfcc=mfcc, chroma=chroma, mel=mel, contrast=contrast, tonnetz=tonnetz)
+                np.savez(f'{df_output_dir}/raw_features_{self.file_output_name}.npz', **features)
                 
                 if verbose == 'v':
-                    print(f"MFCC Shape: {mfcc.shape}")
-                    print(f"Chroma Shape: {chroma.shape}")
-                    print(f"Mel Shape: {mel.shape}")
-                    print(f"Contrast Shape: {contrast.shape}")
-                    print(f"Tonnetz Shape: {tonnetz.shape}")
+                    for name, array in features.items():
+                        print(f"{name.capitalize()} Shape: {array.shape}")
                 
-                return {
-                    'mfcc': mfcc,
-                    'chroma': chroma,
-                    'mel': mel,
-                    'contrast': contrast,
-                    'tonnetz': tonnetz
-                }
+                return features
 
-            mfcc_stats = {}
-            for i in range(13):
-                mfcc_i = mfcc[i, :]
-                mfcc_stats[f'mfcc_{i+1}_mean'] = np.mean(mfcc_i)
-                mfcc_stats[f'mfcc_{i+1}_stddev'] = np.std(mfcc_i)
-                mfcc_stats[f'mfcc_{i+1}_var'] = np.var(mfcc_i)
-                mfcc_stats[f'mfcc_{i+1}_min'] = np.min(mfcc_i)
-                mfcc_stats[f'mfcc_{i+1}_max'] = np.max(mfcc_i)
-            
-            chroma_stats = {}
-            num_chroma_features = chroma.shape[0]
-            num_chroma_frames = chroma.shape[1]
-            for i in range(min(13, num_chroma_features)):  # Avoid out-of-bounds error
-                chroma_i = chroma[i, :]
-                chroma_stats[f'chroma_{i+1}_mean'] = np.mean(chroma_i)
-                chroma_stats[f'chroma_{i+1}_stddev'] = np.std(chroma_i)
-                chroma_stats[f'chroma_{i+1}_var'] = np.var(chroma_i)
-                chroma_stats[f'chroma_{i+1}_min'] = np.min(chroma_i)
-                chroma_stats[f'chroma_{i+1}_max'] = np.max(chroma_i)
-
-            mel_stats = {}
-            num_mel_features = mel.shape[0]
-            for i in range(num_mel_features):
-                mel_i = mel[i, :]
-                mel_stats[f'mel_{i+1}_mean'] = np.mean(mel_i)
-                mel_stats[f'mel_{i+1}_stddev'] = np.std(mel_i)
-                mel_stats[f'mel_{i+1}_var'] = np.var(mel_i)
-                mel_stats[f'mel_{i+1}_min'] = np.min(mel_i)
-                mel_stats[f'mel_{i+1}_max'] = np.max(mel_i)
-
-            contrast_stats = {}
-            num_contrast_features = contrast.shape[0]
-            for i in range(num_contrast_features):
-                contrast_i = contrast[i, :]
-                contrast_stats[f'contrast_{i+1}_mean'] = np.mean(contrast_i)
-                contrast_stats[f'contrast_{i+1}_stddev'] = np.std(contrast_i)
-                contrast_stats[f'contrast_{i+1}_var'] = np.var(contrast_i)
-                contrast_stats[f'contrast_{i+1}_min'] = np.min(contrast_i)
-                contrast_stats[f'contrast_{i+1}_max'] = np.max(contrast_i)
-
-            tonnetz_stats = {}
-            num_tonnetz_features = tonnetz.shape[0]
-            for i in range(num_tonnetz_features):
-                tonnetz_i = tonnetz[i, :]
-                tonnetz_stats[f'tonnetz_{i+1}_mean'] = np.mean(tonnetz_i)
-                tonnetz_stats[f'tonnetz_{i+1}_stddev'] = np.std(tonnetz_i)
-                tonnetz_stats[f'tonnetz_{i+1}_var'] = np.var(tonnetz_i)
-                tonnetz_stats[f'tonnetz_{i+1}_min'] = np.min(tonnetz_i)
-                tonnetz_stats[f'tonnetz_{i+1}_max'] = np.max(tonnetz_i)
-                
-            spectral_bandwidth_stats = {}
-            num_bandwidth_features = spectral_bandwidth.shape[0]
-            for i in range(num_bandwidth_features):
-                bandwidth_i = spectral_bandwidth[i, :]
-                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_mean'] = np.mean(bandwidth_i)
-                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_stddev'] = np.std(bandwidth_i)
-                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_var'] = np.var(bandwidth_i)
-                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_min'] = np.min(bandwidth_i)
-                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_max'] = np.max(bandwidth_i)
-                
-            spectral_flatness_stats = {}
-            num_flatness_features = spectral_flatness.shape[0]
-            for i in range(num_flatness_features):
-                flatness_i = spectral_flatness[i, :]
-                spectral_flatness_stats[f'spectral_flatness_{i+1}_mean'] = np.mean(flatness_i)
-                spectral_flatness_stats[f'spectral_flatness_{i+1}_stddev'] = np.std(flatness_i)
-                spectral_flatness_stats[f'spectral_flatness_{i+1}_var'] = np.var(flatness_i)
-                spectral_flatness_stats[f'spectral_flatness_{i+1}_min'] = np.min(flatness_i)
-                spectral_flatness_stats[f'spectral_flatness_{i+1}_max'] = np.max(flatness_i)
-
-            spectral_centroid_stats = {}
-            num_centroid_features = spectral_centroid.shape[0]
-            for i in range(num_centroid_features):
-                centroid_i = spectral_centroid[i, :]
-                spectral_centroid_stats[f'spectral_centroid_{i+1}_mean'] = np.mean(centroid_i)
-                spectral_centroid_stats[f'spectral_centroid_{i+1}_stddev'] = np.std(centroid_i)
-                spectral_centroid_stats[f'spectral_centroid_{i+1}_var'] = np.var(centroid_i)
-                spectral_centroid_stats[f'spectral_centroid_{i+1}_min'] = np.min(centroid_i)
-                spectral_centroid_stats[f'spectral_centroid_{i+1}_max'] = np.max(centroid_i)
-
-            zero_crossing_rate_stats = {}
-            num_zero_crossing_features = zero_crossing_rate.shape[0]
-            for i in range(num_zero_crossing_features):
-                zero_crossing_i = zero_crossing_rate[i, :]
-                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_mean'] = np.mean(zero_crossing_i)
-                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_stddev'] = np.std(zero_crossing_i)
-                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_var'] = np.var(zero_crossing_i)
-                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_min'] = np.min(zero_crossing_i)
-                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_max'] = np.max(zero_crossing_i)
-
+            # Compute statistics for each feature
+            feature_stats = {}
+            for feature_name, feature_array in features.items():
+                if feature_array.ndim == 1:  # If the feature is 1D
+                    feature_stats.update({
+                        f'{feature_name}_mean': np.mean(feature_array),
+                        f'{feature_name}_stddev': np.std(feature_array),
+                        f'{feature_name}_var': np.var(feature_array),
+                        f'{feature_name}_min': np.min(feature_array),
+                        f'{feature_name}_max': np.max(feature_array)
+                    })
+                else:  # If the feature is 2D
+                    num_features = feature_array.shape[0]
+                    for i in range(num_features):
+                        feature_i = feature_array[i, :]
+                        feature_stats.update({
+                            f'{feature_name}_{i+1}_{key}': value
+                            for key, value in self.compute_stats_and_measures(feature_i, compute_ecdf=False, compute_kde=False).items()
+                        })
 
             if verbose == 'v':
-                print(f"EXTRACTING: mfcc_stats\n{mfcc_stats}")
-                print(f"EXTRACTING: chroma_stats\n{chroma_stats}")
-                print(f"EXTRACTING: mel_stats\n{mel_stats}")
-                print(f"EXTRACTING: contrast_stats\n{contrast_stats}")
-                print(f"EXTRACTING: tonnetz_stats\n{tonnetz_stats}")
-                print(f"EXTRACTING: spectral_bandwidth_stats\n{spectral_bandwidth_stats}")
-                print(f"EXTRACTING: spectral_flatness_stats\n{spectral_flatness_stats}")
-                print(f"EXTRACTING: spectral_centroid_stats\n{spectral_centroid_stats}")
-                print(f"EXTRACTING: zero_crossing_rate_stats\n{zero_crossing_rate_stats}")
+                for key, value in feature_stats.items():
+                    print(f"EXTRACTING: {key}\n{value}")
 
-
-            return {
-                **mfcc_stats, 
-                **chroma_stats, 
-                **mel_stats, 
-                **contrast_stats, 
-                **tonnetz_stats, 
-                **spectral_bandwidth_stats, 
-                **spectral_flatness_stats,
-                **spectral_centroid_stats,
-                **zero_crossing_rate_stats
-            }
+            return feature_stats
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
@@ -218,7 +147,7 @@ class MusicDataProcessor:
 def main():
     dataset_path = 'genres'  # Replace with the path to your audio dataset
     file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'v3_full_xtract_all_songs'  # Name for the output CSV file
+    file_output_name = 'v3_full_no_kde'  # Name for the output CSV file
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(
