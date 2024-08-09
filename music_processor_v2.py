@@ -33,27 +33,6 @@ class MusicDataProcessor:
         self.data.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
         return self.data
 
-    def validate_stats(self, mfcc_array):
-        try:
-            if len(mfcc_array.shape) != 2:
-                raise ValueError("Input must be a 2D numpy array.")
-            
-            mfcc_means = {}
-            for i in range(13):
-                mfcc_i = mfcc_array[i, :]
-                mean_value = np.mean(mfcc_i)
-                mfcc_means[f'mfcc_{i+1}_mean'] = mean_value
-                print(f"MFCC {i+1} Mean: {mean_value}")
-
-            
-            means_df = pd.DataFrame([mfcc_means])
-            means_df.to_csv(f'{df_output_dir}/validations_{self.file_output_name}.csv', index=False)
-            
-            return mfcc_means
-
-        except Exception as e:
-            print(f"Error in validate_stats: {e}")
-            return None
 
     def extract_features(self, file_path, verbose='v'):
         try:
@@ -66,6 +45,7 @@ class MusicDataProcessor:
             mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft)
             contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft)
             tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
+
             
             if self.extract_raw_only is not None and self.extract_raw_only:
                 # Save raw features to CSV for full inspection
@@ -85,9 +65,6 @@ class MusicDataProcessor:
                     'contrast': contrast,
                     'tonnetz': tonnetz
                 }
-                
-            # VALIDATE
-            self.validate_stats(mfcc)
 
             mfcc_stats = {}
             for i in range(13):
@@ -164,14 +141,13 @@ class MusicDataProcessor:
                 file_path = os.path.join(genre_dir, file)
                 features = self.extract_features(file_path, 'v')
                 if features:
-                    # Flatten and prepare the data structure
-                    stats_flat = features  # Directly use the mfcc_stats dictionary
-                    
+                    # Flatten and unpack the data structure
+                    stats_flat = features
                     all_data.append({
                         'filename': file,
                         'genre': genre,
                         **stats_flat
-                    })
+                    })                                      
                     counter += 1
 
         self.data = pd.DataFrame(all_data)
@@ -180,8 +156,8 @@ class MusicDataProcessor:
 # ------------------------------- MAIN -------------------------------
 def main():
     dataset_path = 'genres'  # Replace with the path to your audio dataset
-    file_depth_limit = 3  # Number of files to process per genre
-    file_output_name = 'only_raw_3'  # Name for the output CSV file
+    file_depth_limit = None  # Number of files to process per genre
+    file_output_name = 'full_xtract_all_songs'  # Name for the output CSV file
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(

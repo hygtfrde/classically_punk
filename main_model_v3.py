@@ -111,11 +111,11 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
 
 
 def main():
-    only_mfcc = 'df_output/only_mfcc_huge.csv'
+    full_xtract = 'df_output/full_xtract_all_songs.csv'
     test_csv_path = 'df_output/test_1.csv'
     try:
         # Read and prepare data
-        X, y = read_csv_and_split_df(only_mfcc)
+        X, y = read_csv_and_split_df(full_xtract)
         categories = y.unique()
         num_classes = len(categories)
         X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
