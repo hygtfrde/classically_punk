@@ -14,3 +14,6 @@ visualizations/*
 df_output/_default.xlsx
 !df_output
 !df_output/_df_output.md
+
+# DF OUTPUTS
+df_output/v3_full_kde.csv

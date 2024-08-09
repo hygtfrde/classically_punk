@@ -106,6 +106,8 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     print(f"Accuracy: {accuracy:.2f}%")
     print(f"Correct: {correct_count}, Incorrect: {incorrect_count}")
 
+    sys.stdout.write("\n")
+    sys.stdout.flush()
     sys.exit()
     # return accuracy, correct_count, incorrect_count
     
@@ -115,7 +117,7 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
 
 
 def main():
-    full_xtract = 'df_output/v3_full_xtract_all_songs.csv'
+    full_xtract = 'df_output/v3_full_no_kde.csv'
     test_csv_path = 'df_output/test_1.csv'
     
     def get_input_with_timeout(prompt, timeout=15):
@@ -203,6 +205,8 @@ def main():
         
         # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
         sys.exit()
         
     except Exception as e:
