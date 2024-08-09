@@ -45,7 +45,10 @@ class MusicDataProcessor:
             mel = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft)
             contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft)
             tonnetz = librosa.feature.tonnetz(y=y, sr=sr)
-
+            spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)
+            spectral_flatness = librosa.feature.spectral_flatness(y=y)
+            spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
+            zero_crossing_rate = librosa.feature.zero_crossing_rate(y=y)
             
             if self.extract_raw_only is not None and self.extract_raw_only:
                 # Save raw features to CSV for full inspection
@@ -115,6 +118,47 @@ class MusicDataProcessor:
                 tonnetz_stats[f'tonnetz_{i+1}_var'] = np.var(tonnetz_i)
                 tonnetz_stats[f'tonnetz_{i+1}_min'] = np.min(tonnetz_i)
                 tonnetz_stats[f'tonnetz_{i+1}_max'] = np.max(tonnetz_i)
+                
+            spectral_bandwidth_stats = {}
+            num_bandwidth_features = spectral_bandwidth.shape[0]
+            for i in range(num_bandwidth_features):
+                bandwidth_i = spectral_bandwidth[i, :]
+                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_mean'] = np.mean(bandwidth_i)
+                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_stddev'] = np.std(bandwidth_i)
+                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_var'] = np.var(bandwidth_i)
+                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_min'] = np.min(bandwidth_i)
+                spectral_bandwidth_stats[f'spectral_bandwidth_{i+1}_max'] = np.max(bandwidth_i)
+                
+            spectral_flatness_stats = {}
+            num_flatness_features = spectral_flatness.shape[0]
+            for i in range(num_flatness_features):
+                flatness_i = spectral_flatness[i, :]
+                spectral_flatness_stats[f'spectral_flatness_{i+1}_mean'] = np.mean(flatness_i)
+                spectral_flatness_stats[f'spectral_flatness_{i+1}_stddev'] = np.std(flatness_i)
+                spectral_flatness_stats[f'spectral_flatness_{i+1}_var'] = np.var(flatness_i)
+                spectral_flatness_stats[f'spectral_flatness_{i+1}_min'] = np.min(flatness_i)
+                spectral_flatness_stats[f'spectral_flatness_{i+1}_max'] = np.max(flatness_i)
+
+            spectral_centroid_stats = {}
+            num_centroid_features = spectral_centroid.shape[0]
+            for i in range(num_centroid_features):
+                centroid_i = spectral_centroid[i, :]
+                spectral_centroid_stats[f'spectral_centroid_{i+1}_mean'] = np.mean(centroid_i)
+                spectral_centroid_stats[f'spectral_centroid_{i+1}_stddev'] = np.std(centroid_i)
+                spectral_centroid_stats[f'spectral_centroid_{i+1}_var'] = np.var(centroid_i)
+                spectral_centroid_stats[f'spectral_centroid_{i+1}_min'] = np.min(centroid_i)
+                spectral_centroid_stats[f'spectral_centroid_{i+1}_max'] = np.max(centroid_i)
+
+            zero_crossing_rate_stats = {}
+            num_zero_crossing_features = zero_crossing_rate.shape[0]
+            for i in range(num_zero_crossing_features):
+                zero_crossing_i = zero_crossing_rate[i, :]
+                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_mean'] = np.mean(zero_crossing_i)
+                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_stddev'] = np.std(zero_crossing_i)
+                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_var'] = np.var(zero_crossing_i)
+                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_min'] = np.min(zero_crossing_i)
+                zero_crossing_rate_stats[f'zero_crossing_rate_{i+1}_max'] = np.max(zero_crossing_i)
+
 
             if verbose == 'v':
                 print(f"EXTRACTING: mfcc_stats\n{mfcc_stats}")
@@ -122,8 +166,23 @@ class MusicDataProcessor:
                 print(f"EXTRACTING: mel_stats\n{mel_stats}")
                 print(f"EXTRACTING: contrast_stats\n{contrast_stats}")
                 print(f"EXTRACTING: tonnetz_stats\n{tonnetz_stats}")
+                print(f"EXTRACTING: spectral_bandwidth_stats\n{spectral_bandwidth_stats}")
+                print(f"EXTRACTING: spectral_flatness_stats\n{spectral_flatness_stats}")
+                print(f"EXTRACTING: spectral_centroid_stats\n{spectral_centroid_stats}")
+                print(f"EXTRACTING: zero_crossing_rate_stats\n{zero_crossing_rate_stats}")
 
-            return {**mfcc_stats, **chroma_stats, **mel_stats, **contrast_stats, **tonnetz_stats}
+
+            return {
+                **mfcc_stats, 
+                **chroma_stats, 
+                **mel_stats, 
+                **contrast_stats, 
+                **tonnetz_stats, 
+                **spectral_bandwidth_stats, 
+                **spectral_flatness_stats,
+                **spectral_centroid_stats,
+                **zero_crossing_rate_stats
+            }
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
@@ -157,7 +216,7 @@ class MusicDataProcessor:
 def main():
     dataset_path = 'genres'  # Replace with the path to your audio dataset
     file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'full_xtract_all_songs'  # Name for the output CSV file
+    file_output_name = 'v3_full_xtract_all_songs'  # Name for the output CSV file
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(

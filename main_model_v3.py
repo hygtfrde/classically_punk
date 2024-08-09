@@ -1,4 +1,7 @@
 import ast
+import threading
+import queue
+import sys
 
 import tensorflow as tf
 import numpy as np
@@ -51,7 +54,7 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
         X_train, 
         y_train, 
         epochs=3000, 
-        batch_size=64, 
+        batch_size=128, 
         validation_data=(X_test, y_test),
         verbose=1
     )
@@ -111,8 +114,27 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
 
 
 def main():
-    full_xtract = 'df_output/full_xtract_all_songs.csv'
+    full_xtract = 'df_output/v3_full_xtract_all_songs.csv'
     test_csv_path = 'df_output/test_1.csv'
+    
+    def get_input_with_timeout(prompt, timeout=15):
+        print(prompt, end='', flush=True)
+        input_queue = queue.Queue()
+        
+        def input_thread():
+            user_input = input()
+            input_queue.put(user_input)
+        
+        thread = threading.Thread(target=input_thread)
+        thread.start()
+        thread.join(timeout)
+        
+        if thread.is_alive():
+            # Timeout occurred, we assume the user did not respond
+            return 'N'
+        else:
+            return input_queue.get().strip().upper()
+    
     try:
         # Read and prepare data
         X, y = read_csv_and_split_df(full_xtract)
@@ -135,12 +157,13 @@ def main():
         for key in history.history.keys():
             print(f"{key}: {history.history[key]}")
         
+
         # Make Predictions with user input for row or song to test
         while True:
             try:
-                prompt_for_start_predictor = input("Would you like to predict a genre (Y/N)? ").strip().upper()
+                prompt_for_start_predictor = get_input_with_timeout("Would you like to predict a genre (Y/N)? ")
                 if prompt_for_start_predictor == 'Y':
-                    row_input = input(f"Enter a row number (0 to {len(X) - 1}), or Q to skip: ").strip().upper()
+                    row_input = get_input_with_timeout(f"Enter a row number (0 to {len(X) - 1}), or Q to skip: ")
                     if row_input == 'Q':
                         break  # Exit the loop if the user wants to skip
 
@@ -159,7 +182,7 @@ def main():
                     print(f"Selected genre:\n{GREEN}{selected_genre}{RESET}")
 
                     # Confirm to use this row for prediction
-                    confirm = input("Do you want to use this song data for prediction? (Y/N), Enter for Y, or Q to quit: ").strip().upper()
+                    confirm = get_input_with_timeout("Do you want to use this song data for prediction? (Y/N), Enter for Y, or Q to quit: ")
                     if confirm in ('Y', ''):
                         # Make prediction
                         example_feature_inputs = selected_row.values
@@ -179,7 +202,8 @@ def main():
         
         # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
-    
+        sys.exit()
+        
     except Exception as e:
         print(f"An error occurred in main block: {e}")
 
