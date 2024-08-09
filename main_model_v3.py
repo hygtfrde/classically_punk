@@ -106,8 +106,9 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     print(f"Accuracy: {accuracy:.2f}%")
     print(f"Correct: {correct_count}, Incorrect: {incorrect_count}")
 
-    return accuracy, correct_count, incorrect_count
-
+    sys.exit()
+    # return accuracy, correct_count, incorrect_count
+    
 
 
 
