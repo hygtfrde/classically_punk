@@ -1,10 +1,12 @@
 import os
+import time
 
 import pandas as pd
 import numpy as np
 import librosa
 from sklearn.decomposition import PCA
 import scipy.stats as stats
+from scipy.stats import kurtosis, skew
 
 
 
@@ -17,13 +19,23 @@ fundamental_features_cols = [
 df_output_dir = 'df_output'
 
 class MusicDataProcessor:
-    def __init__(self, dataset_path: str, file_depth_limit: int, file_output_name: str, extract_raw_only: bool):
+    def __init__(
+        self, 
+        dataset_path: str, 
+        file_depth_limit: int, 
+        file_output_name: str, 
+        extract_raw_only: bool,
+        compute_kde: bool,
+        compute_ecdf: bool
+        ):
         self.dataset_path = dataset_path
         self.file_depth_limit = file_depth_limit
         self.file_output_name = file_output_name
         self.genres = genres_from_dataset
         self.data = pd.DataFrame(columns=fundamental_features_cols)
         self.extract_raw_only = extract_raw_only
+        self.compute_kde = compute_kde
+        self.compute_ecdf = compute_ecdf
 
         if not os.path.exists(df_output_dir):
             os.makedirs(df_output_dir)
@@ -35,7 +47,7 @@ class MusicDataProcessor:
         self.data.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
         return self.data
 
-    def compute_stats_and_measures(self, data, compute_kde: bool, compute_ecdf: bool):
+    def compute_stats_and_measures(self, data):
         # Compute basic statistics
         stats_dict = {
             'mean': np.mean(data),
@@ -43,17 +55,19 @@ class MusicDataProcessor:
             'var': np.var(data),
             'min': np.min(data),
             'max': np.max(data),
-            'mad': stats.median_abs_deviation(data)
+            'mad': stats.median_abs_deviation(data),
+            'kurtosis': kurtosis(data),
+            'skewness': skew(data)
         }
         
         # Compute ECDF
-        if compute_ecdf:
+        if self.compute_ecdf:
             sorted_data, ecdf = np.sort(data), np.arange(1, len(data) + 1) / len(data)
             stats_dict['ecdf_values'] = sorted_data.tolist()
             stats_dict['ecdf_proportions'] = ecdf.tolist()
         
         # Compute KDE
-        if compute_kde:
+        if self.compute_kde:
             kde = stats.gaussian_kde(data)
             stats_dict['kde'] = kde
         
@@ -77,7 +91,9 @@ class MusicDataProcessor:
                 'zero_crossing_rate': librosa.feature.zero_crossing_rate(y=y),
                 'harmony': librosa.effects.harmonic(y),
                 'perceptr': librosa.effects.percussive(y),
-                'tempo': librosa.beat.beat_track(y=y, sr=sr)[0]
+                'tempo': librosa.beat.beat_track(y=y, sr=sr)[0],
+                'spectral_rolloff': librosa.feature.spectral_rolloff(y=y, sr=sr),
+                'rms': librosa.feature.rms(y=y)
             }
             
             if self.extract_raw_only is not None and self.extract_raw_only:
@@ -106,7 +122,7 @@ class MusicDataProcessor:
                         feature_i = feature_array[i, :]
                         feature_stats.update({
                             f'{feature_name}_{i+1}_{key}': value
-                            for key, value in self.compute_stats_and_measures(feature_i, compute_ecdf=False, compute_kde=False).items()
+                            for key, value in self.compute_stats_and_measures(feature_i).items()
                         })
 
             if verbose == 'v':
@@ -118,6 +134,8 @@ class MusicDataProcessor:
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
             return None
+
+
 
     def load_data(self):
         all_data = []
@@ -145,16 +163,21 @@ class MusicDataProcessor:
 
 # ------------------------------- MAIN -------------------------------
 def main():
+    # Start the timer
+    start_time = time.time()
+    
     dataset_path = 'genres'  # Replace with the path to your audio dataset
     file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'v3_full_no_kde'  # Name for the output CSV file
+    file_output_name = 'v4_new_stats'  # Name for the output CSV file
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(
         dataset_path=dataset_path,
         file_output_name=file_output_name, 
         file_depth_limit=file_depth_limit,
-        extract_raw_only=None
+        extract_raw_only=None,
+        compute_kde=False,
+        compute_ecdf=False
     )
 
     # Load data
@@ -163,6 +186,14 @@ def main():
     # Output the processed data
     print(f"Data has been processed and saved to CSV file: {file_output_name}.")
     print(processor.data.head())  # Display the first few rows of the processed data
+    
+    # End the timer
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    minutes = int(elapsed_time // 60)
+    seconds = int(elapsed_time % 60)
+
+    print(f"Time taken: {minutes} minutes and {seconds} seconds")
 
 if __name__ == "__main__":
     main()
