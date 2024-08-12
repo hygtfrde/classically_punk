@@ -139,11 +139,12 @@ class MusicDataProcessor:
 
     def load_data(self):
         all_data = []
+        total_files_counter = 0
         for genre in self.genres:
             counter = 0
             genre_dir = os.path.join(self.dataset_path, genre)
             for file in os.listdir(genre_dir):
-                print(f'File number: {counter}')
+                print(f'File number: {total_files_counter}')
                 if self.file_depth_limit and counter >= self.file_depth_limit:
                     break
                 file_path = os.path.join(genre_dir, file)
@@ -157,6 +158,7 @@ class MusicDataProcessor:
                         **stats_flat
                     })                                      
                     counter += 1
+                    total_files_counter += 1
 
         self.data = pd.DataFrame(all_data)
         self.get_data()
@@ -168,14 +170,14 @@ def main():
     
     dataset_path = 'genres'  # Replace with the path to your audio dataset
     file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'v4_new_stats'  # Name for the output CSV file
+    file_output_name = 'v4_raw'  # Name for the output CSV file
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(
         dataset_path=dataset_path,
         file_output_name=file_output_name, 
         file_depth_limit=file_depth_limit,
-        extract_raw_only=None,
+        extract_raw_only=True,
         compute_kde=False,
         compute_ecdf=False
     )

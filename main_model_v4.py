@@ -120,6 +120,8 @@ def main():
     full_xtract = 'df_output/v3_full_no_kde.csv'
     test_csv_path = 'df_output/test_1.csv'
     
+    _2d_numpy = 'df_output/v4_raw.csv'
+    
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)
         input_queue = queue.Queue()
@@ -140,7 +142,7 @@ def main():
     
     try:
         # Read and prepare data
-        X, y = read_csv_and_split_df(full_xtract)
+        X, y = read_csv_and_split_df(_2d_numpy)
         categories = y.unique()
         num_classes = len(categories)
         X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
