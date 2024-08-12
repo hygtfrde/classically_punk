@@ -1,5 +1,6 @@
 import os
 import time
+import json
 
 import pandas as pd
 import numpy as np
@@ -20,13 +21,13 @@ df_output_dir = 'df_output'
 
 class MusicDataProcessor:
     def __init__(
-        self, 
-        dataset_path: str, 
-        file_depth_limit: int, 
-        file_output_name: str, 
-        extract_raw_only: bool,
-        compute_kde: bool,
-        compute_ecdf: bool
+            self, 
+            dataset_path: str, 
+            file_depth_limit: int, 
+            file_output_name: str, 
+            extract_raw_only: bool,
+            compute_kde: bool,
+            compute_ecdf: bool
         ):
         self.dataset_path = dataset_path
         self.file_depth_limit = file_depth_limit
@@ -44,7 +45,16 @@ class MusicDataProcessor:
             print(f"Directory '{df_output_dir}' already exists.")
 
     def get_data(self):
-        self.data.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
+        # Convert the dataframe to a dictionary, converting numpy arrays to lists
+        data_dict = self.data.applymap(lambda x: x.tolist() if isinstance(x, np.ndarray) else x).to_dict(orient='records')
+        
+        # Save the dictionary as a JSON string to avoid truncation issues
+        json_output = json.dumps(data_dict)
+        
+        # Write the JSON string to a CSV file
+        with open(f'{df_output_dir}/{self.file_output_name}.csv', 'w') as file:
+            file.write(json_output)
+            
         return self.data
 
     def compute_stats_and_measures(self, data):
@@ -169,8 +179,8 @@ def main():
     start_time = time.time()
     
     dataset_path = 'genres'  # Replace with the path to your audio dataset
-    file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'v4_raw'  # Name for the output CSV file
+    file_depth_limit = 1  # Number of files to process per genre
+    file_output_name = 'v4_new_getdata()'  # Name for the output CSV file
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(

@@ -120,7 +120,7 @@ def main():
     full_xtract = 'df_output/v3_full_no_kde.csv'
     test_csv_path = 'df_output/test_1.csv'
     
-    _2d_numpy = 'df_output/v4_raw.csv'
+    _2d_numpy = 'df_output/v4_new_getdata().csv'
     
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)

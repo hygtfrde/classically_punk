@@ -5,6 +5,7 @@ _blob*
 __pycache__
 
 scripts/.DS_Store
+scripts/__pycache__
 
 visualizations/*
 !visualizations/
