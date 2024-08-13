@@ -7,10 +7,12 @@ import json
 import tensorflow as tf
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Input
+from tensorflow.keras.utils import to_categorical
+
 
 GREEN = '\033[32m'
 RED = '\033[31m'
@@ -18,7 +20,7 @@ RESET = '\033[0m'
 
 
 # -----------------------------------------------------------------------------------------
-def convert_string_to_array0(string):
+def convert_string_to_array_v0(string):
     try:
         list_of_floats = ast.literal_eval(string)
         return np.array(list_of_floats, dtype=float)  # Ensure float type
@@ -34,64 +36,105 @@ def read_csv_and_split_df(csv_path):
     return X, y
 # -----------------------------------------------------------------------------------------
 
+# -----------------------------------------------------------------------------------------
+def read_large_csv_in_chunks(csv_path):
+    chunk_size = 100
+    chunks = []
+    try:
+        for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
+            # Apply conversion on each chunk
+            for col in chunk.columns:
+                if col not in ['filename', 'genre']:
+                    chunk[col] = chunk[col].apply(convert_string_to_array)
+            chunks.append(chunk)
+        
+        # Concatenate chunks
+        df = pd.concat(chunks, ignore_index=True)
+        # X = df.drop(columns=['filename', 'genre'])
+        # y = df['genre']
+        return df
+    
+    except Exception as e:
+        print(f"Error processing CSV in chunks: {e}")
+        return None, None
+# -----------------------------------------------------------------------------------------
+
+
+
+
+
 
 def convert_string_to_array(value):
-    # If the value is a string and starts with a single or double quote, strip the quotes
-    if isinstance(value, str) and (value.startswith('"') or value.startswith("'")):
-        value = value.strip('"').strip("'")
-        try:
-            # Try to convert the string to a list or numpy array
-            value = ast.literal_eval(value)
-            if isinstance(value, list):
-                return np.array(value)
-        except (ValueError, SyntaxError):
-            pass  # Return the original value if it can't be converted
-    return value
+    try:
+        print(f"Processing value of type: {type(value)}")
+        print(f"Value starts with: {str(value)[:50]}")
+        
+        if isinstance(value, str):
+            value = value.strip('"').strip("'")
+            try:
+                value = ast.literal_eval(value)
+                
+                if isinstance(value, list):
+                    # Convert list to numpy array
+                    value = np.array(value, dtype=float)
+                    
+                    # Flatten if it's a 2D array with one row
+                    # if value.ndim == 2 and value.shape[0] == 1:
+                    #     value = value.flatten()
+                    
+                    print(f"Converted array shape: {value.shape}")
+                    return value
+                else:
+                    print("Warning: Evaluated value is not a list.")
+            except (ValueError, SyntaxError) as e:
+                print(f"Error evaluating string: {e}")
+        else:
+            print('Value not detected as str')
+        
+        return value
+    except Exception as e:
+        print("General failure in conversion:")
+        print(f'Error: {e}')
+        return value
 
-def convert_string_df_to_array(df_input):
-    # Apply the conversion to each cell in the DataFrame
-    for col in df_input.columns:
-        df_input[col] = df_input[col].apply(convert_string_to_array)
-    
-    return df_input
 
-
-def convert_string_df_to_array(df_input):
-    # if starts with single ' quote or double " quote
-    # then remove or strip quotes off
-    # allow for long processing times, perhaps asynchronously
-    # ensure that: order of rows must be preserved to map correctly to original
-    
-    
-    if isinstance(value, str) and (value.startswith('[') or value.startswith("[")):
-        try:
-            list_of_np_arrs = ast.literal_eval(value)
-            if isinstance(list_of_np_arrs, list) and isinstance(list_of_np_arrs[0], list):
-                return np.array(list_of_np_arrs, dtype=float)  # Convert to 2D numpy array
-            else:
-                return np.array(list_of_np_arrs, dtype=float)  # Convert to 1D numpy array
-        except (ValueError, SyntaxError) as e:
-            print(f"{RED}Error converting string to array: {e}{RESET}")
-            return np.array([])
-    return value
 
 def read_raw_str_csv_and_split_df(csv_path):
     try:
-        df = pd.read_csv(csv_path)
-
-        # Apply stripping quotes and conversion to numpy arrays
-        for col in df.columns:
-            if col not in ['filename', 'genre']:
-                df[col] = df[col].apply(lambda x: convert_string_to_array(x))
-        
-        # Separate features and target
-        X = df.drop(columns=['filename', 'genre'])
-        y = df['genre']
-        
-        return X, y
+        df_input = pd.read_csv(csv_path)
     except Exception as e:
-        print(f"Error processing CSV: {e}")
+        print(f"Error reading csv into df: {e}")
         return None, None
+    
+    if df_input is not None:
+        for col in df_input.columns:
+            print(f"Column '{col}' data type: {df_input[col].dtype}")
+            print(f"First 10 characters of values in column '{col}':")
+            for value in df_input[col].head(5):
+                print(f"{str(value)[:50]}")
+            print()
+            
+            if col not in ['filename', 'genre', 'harmony', 'perceptr', 'tempo']:
+                df_input[col] = df_input[col].apply(convert_string_to_array)
+        
+        X = df_input.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+        # y = df_input['genre']
+
+        # Check shapes and types of the X values
+        print('BEGIN SHAPE TEST ----------------------------------------------------- ')
+        for col in X.columns:
+            print(f"Column '{col}', dtype: {X[col].dtype}")
+            for value in X[col].head(5):
+                print(f"Value type: {type(value)}, Shape: {getattr(value, 'shape', 'N/A')}")
+        print('END SHAPE TEST ----------------------------------------------------- ')
+
+        return df_input
+    else:
+        print('Error: df_input is None')
+        return None, None
+    
+    
+
     
     
 
@@ -100,13 +143,61 @@ def read_raw_str_csv_and_split_df(csv_path):
 
 # -----------------------------------------------------------------------------------------
 
+# def prepare_data(X, y, categories):
+#     encoder = OneHotEncoder(sparse_output=False, categories=[categories])
+#     y_encoded = encoder.fit_transform(y.values.reshape(-1, 1))
+#     scaler = StandardScaler()
+#     X_scaled = scaler.fit_transform(X)
+#     X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)  # Convert to DataFrame with feature names
+#     return X_scaled_df, y_encoded, encoder, scaler
+
+# def prepare_data(X, y, categories):
+#     try:
+#         # Flatten the data if it contains nested arrays
+#         X_flattened = pd.DataFrame()
+#         for col in X.columns:
+#             col_data = X[col]
+#             # Handle 2D arrays by flattening or stacking
+#             if isinstance(col_data.iloc[0], np.ndarray) and col_data.iloc[0].ndim > 1:
+#                 col_data = col_data.apply(lambda x: x.flatten())
+#             # Add flattened column to DataFrame
+#             X_flattened[col] = col_data
+        
+#         # Scaling features
+#         scaler = StandardScaler()
+#         X_scaled = scaler.fit_transform(np.stack(X_flattened.to_numpy(), axis=1))
+        
+#         # Encoding labels
+#         encoder = LabelEncoder()
+#         y_encoded = encoder.fit_transform(y)
+        
+#         return X_scaled, y_encoded, encoder, scaler
+#     except Exception as e:
+#         print(f"Error in prepare_data: {e}")
+#         return None, None, None, None
+
 def prepare_data(X, y, categories):
-    encoder = OneHotEncoder(sparse_output=False, categories=[categories])
-    y_encoded = encoder.fit_transform(y.values.reshape(-1, 1))
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)  # Convert to DataFrame with feature names
-    return X_scaled_df, y_encoded, encoder, scaler
+    try:
+        # Step 1: Flatten the features
+        X_flattened = X.apply(lambda col: col.apply(lambda x: x.flatten()))
+
+        # Step 2: Convert the DataFrame of flattened arrays into a 2D NumPy array
+        X_stacked = np.stack(X_flattened.apply(np.concatenate, axis=1).to_numpy())
+
+        # Step 3: Scale the features
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X_stacked)
+
+        # Step 4: Encode the target labels (y)
+        encoder = LabelEncoder()
+        y_encoded = encoder.fit_transform(y)
+
+        return X_scaled, y_encoded, encoder, scaler
+    except Exception as e:
+        print(f"Error in prepare_data: {e}")
+        return None, None, None, None
+    
+
 
 def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_classes):
     model = Sequential([
@@ -204,28 +295,96 @@ def main():
         else:
             return input_queue.get().strip().upper()
     
-    try:
-        # For numerical CSV: read_csv_and_split_df
-        # For raw string CSV: read_raw_str_csv_and_split_df
-        X, y = read_raw_str_csv_and_split_df(full_xtract)
-        categories = y.unique()
-        num_classes = len(categories)
-        X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
-        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
+    try:  
+        df_extract = read_raw_str_csv_and_split_df(full_xtract)
+        
+        # X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+        # y = df_extract['genre']
+        # categories = y.unique()
+        # num_classes = len(categories)
+        # X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
+        # print("=======================> X AND Y SUCCESS")
+        # X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
+        
+        
+        
+        if df_extract is not None:
+            # Split into X and y
+            X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+            y = df_extract['genre']
+            categories = y.unique()
+            num_classes = len(categories)
+
+            print("Check X info:")
+            print(X.head())
+            print("Check y info:")
+            print(y.head())
+
+            # Prepare the data
+            X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
+            print("=======================> X AND Y SUCCESS")
+            print(f"y_encoded shape: {y_encoded.shape}")
+            print(f"Number of classes: {num_classes}")
+            
+            y_encoded_one_hot = to_categorical(y_encoded, num_classes=num_classes)
+            print(f"y_encoded_one_hot shape: {y_encoded_one_hot.shape}")
+
+            if X_scaled is not None and y_encoded is not None:
+                # Proceed with train-test split
+                X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded_one_hot, test_size=0.2, random_state=42)
+            else:
+                print("Error in data preparation")
+        else:
+            print("Error: DataFrame is None")
+
+        
+        
+        
+        # if df_extract is not None:
+        #     # Split into X and y
+        #     X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+        #     y = df_extract['genre']
+        #     categories = y.unique()
+            
+        #     print("Check X info:")
+        #     print(X.head())
+        #     print("Check y info:")
+        #     print(y.head())
+            
+        #     print("Debug")
+        #     print("Preview X before prepare_data:")
+        #     for col in X.columns:
+        #         print(f"Column: {col}, Type: {type(X[col].iloc[0])}, Shape: {getattr(X[col].iloc[0], 'shape', 'N/A')}")
+
+        #     # Prepare the data
+        #     X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
+            
+            
+        #     print("=======================> X AND Y SUCCESS")
+            
+        #     if X_scaled is not None and y_encoded is not None:
+        #         # Proceed with train-test split
+        #         X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded, test_size=0.2, random_state=42)
+        #     else:
+        #         print("Error in data preparation")
+        # else:
+        #     print("Error: DataFrame is None")
         
         # Print data shapes
-        print(f"Training feature matrix shape: {X_train.shape}")
-        print(f"Testing feature matrix shape: {X_test.shape}")
-        print(f"Training target shape: {y_train.shape}")
-        print(f"Testing target shape: {y_test.shape}")
+        # print(f"Training feature matrix shape: {X_train.shape}")
+        # print(f"Testing feature matrix shape: {X_test.shape}")
+        # print(f"Training target shape: {y_train.shape}")
+        # print(f"Testing target shape: {y_test.shape}")
+        
         
         # Build and train model
         model, history = build_and_train_model(X_train, y_train, X_test, y_test, X_scaled.shape[1], num_classes)
         
+        
         # Print training history
-        print("Training history:")
-        for key in history.history.keys():
-            print(f"{key}: {history.history[key]}")
+        # print("Training history:")
+        # for key in history.history.keys():
+        #     print(f"{key}: {history.history[key]}")
         
 
         # Make Predictions with user input for row or song to test
