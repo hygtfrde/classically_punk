@@ -20,47 +20,6 @@ RED = '\033[31m'
 RESET = '\033[0m'
 
 
-# -----------------------------------------------------------------------------------------
-# V0
-def convert_string_to_array_v0(string):
-    try:
-        list_of_floats = ast.literal_eval(string)
-        return np.array(list_of_floats, dtype=float)  # Ensure float type
-    except Exception as e:
-        print(f"Error converting string to array: {e}")
-        return np.array([])
-
-
-def read_csv_and_split_df(csv_path):
-    df = pd.read_csv(csv_path)
-    X = df.drop(columns=['filename', 'genre'])  # Drop non-feature columns
-    y = df['genre']  # Target column
-    return X, y
-# -----------------------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------------------
-# CHUNKING TECHNIQUE
-
-def read_large_csv_in_chunks(csv_path):
-    chunk_size = 100
-    chunks = []
-    try:
-        for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
-            for col in chunk.columns:
-                if col not in ['filename', 'genre']:
-                    chunk[col] = chunk[col].apply(convert_string_to_array)
-            chunks.append(chunk)
-        
-        # Concatenate chunks
-        df = pd.concat(chunks, ignore_index=True)
-        return df
-    
-    except Exception as e:
-        print(f"Error processing CSV in chunks: {e}")
-        return None, None
-# -----------------------------------------------------------------------------------------
-
-
 
 def convert_string_to_array(value):
     try:
@@ -125,31 +84,102 @@ def read_raw_str_csv_and_split_df(csv_path):
     
 
 
+def pad_or_truncate(array, target_shape):
+    if array.shape[1] < target_shape[1]:
+        padding = ((0, 0), (0, target_shape[1] - array.shape[1]))
+        return np.pad(array, padding, mode='constant')
+    elif array.shape[1] > target_shape[1]:
+        return array[:, :target_shape[1]]
+    else:
+        return array
+
+
+def process_data(X, y, target_shape):
+    # Ensure X is numeric and consistent in shape
+    X_numeric = X.apply(lambda col: np.array([np.array(x) for x in col]))
+    X_padded = X_numeric.apply(lambda col: pad_or_truncate(np.array(col.tolist()), target_shape))
+    
+    # Flatten if necessary
+    X_flattened = X_padded.apply(lambda col: np.array([x.flatten() for x in col]))
+
+    # Convert to NumPy array
+    X_array = np.array(X_flattened.tolist())
+    
+    # One-hot encode y
+    encoder = OneHotEncoder(sparse=False)
+    y_encoded = encoder.fit_transform(y.reshape(-1, 1))
+    
+    return X_array, y_encoded
+
+
+
+def normalize_array_lengths(X, target_length):
+    return X.map(lambda x: pad_or_truncate(x, target_length))
+
+def find_min_length(X):
+    # Check that this function is returning an integer
+    lengths = [arr.shape[1] for arr in X if isinstance(arr, np.ndarray)]
+    min_length = min(lengths) if lengths else 0
+    print(f"find_min_length - lengths: {lengths}, min_length: {min_length}")
+    return min_length
+
+def truncate_to_min_length(X, min_length):
+    truncated_X = [arr[:, :min_length] if arr.shape[1] > min_length else arr for arr in X]
+    print(f"truncate_to_min_length - min_length: {min_length}")
+    return np.array(truncated_X)
 
 def prepare_data(X, y, categories):
     try:
-        # Step 1: Flatten the features
-        X_flattened = X.apply(lambda col: col.apply(lambda x: x.flatten()))
+        # Ensure X contains NumPy arrays
+        for col in X.columns:
+            X[col] = X[col].apply(lambda x: np.array(x) if isinstance(x, list) else x)
+        
+        # Verify if conversion was successful
+        for col in X.columns:
+            if not all(isinstance(val, np.ndarray) for val in X[col]):
+                print(f"Column '{col}' contains non-NumPy array values.")
+        
+        # Find minimum length for truncation
+        min_length = find_min_length(X.values.flatten())
+        print(f"min_length: {min_length}")
 
-        # Step 2: Convert the DataFrame of flattened arrays into a 2D NumPy array
-        X_stacked = np.stack(X_flattened.apply(np.concatenate, axis=1).to_numpy())
+        # Truncate data to minimum length
+        X_truncated = truncate_to_min_length(X.values.flatten(), min_length)
+        num_samples, num_features = X_truncated.shape
+        print(f"X_truncated shape: {X_truncated.shape}")
 
-        # Step 3: Scale the features
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X_stacked)
+        num_categories = len(categories)
+        print(f"Number of categories: {num_categories}")
 
-        # Step 4: Encode the target labels (y)
+        y_encoded = pd.get_dummies(y).values
+        print(f"y_encoded shape: {y_encoded.shape}")
+
         encoder = LabelEncoder()
-        y_encoded = encoder.fit_transform(y)
+        scaler = StandardScaler()
+        
+        return X_truncated, y_encoded, encoder, scaler
 
-        return X_scaled, y_encoded, encoder, scaler
     except Exception as e:
         print(f"Error in prepare_data: {e}")
-        return None, None, None, None
-    
+        raise
+
+
 
 
 def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_classes):
+    X_train = np.array(X_train, dtype=np.float32)
+    y_train = np.array(y_train, dtype=np.float32)
+    X_test = np.array(X_test, dtype=np.float32)
+    y_test = np.array(y_test, dtype=np.float32)
+
+    # Print shapes and types for debugging
+    print("X_train shape:", X_train.shape)
+    print("y_train shape:", y_train.shape)
+    print("X_test shape:", X_test.shape)
+    print("y_test shape:", y_test.shape)
+    print("X_train dtype:", X_train.dtype)
+    print("y_train dtype:", y_train.dtype)
+    
     model = Sequential([
         Input(shape=(num_features,)),
         Dense(64, activation='relu'),
@@ -168,6 +198,8 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
     )
     
     return model, history
+
+
 
 def predict(model, encoder, scaler, feature_inputs):
     # Scale the feature inputs directly without converting to DataFrame
@@ -241,8 +273,8 @@ def save_data(X_scaled, y, X_scaled_path='pickles/X_scaled.pkl', y_path='pickles
 # -----------------------------------------------------------------------------------------
 
 def main():
-    full_xtract = 'df_output/v4_encoded_strings.csv'
-    stable_xtract = 'df_output/v4_encoded_strings_stable.csv'
+    full_xtract = 'df_output/v4_full_huge.csv'
+    file_limit_2 = 'df_output/v4_file_depth_2.csv'
     
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)
@@ -261,10 +293,10 @@ def main():
             return 'N'
         else:
             return input_queue.get().strip().upper()
-
+ 
     try:
-        df_extract = read_raw_str_csv_and_split_df(stable_xtract)
-        
+        df_extract = read_raw_str_csv_and_split_df(file_limit_2)
+
         if df_extract is not None:
             # Split into X and y
             X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
@@ -272,10 +304,16 @@ def main():
             categories = y.unique()
             num_classes = len(categories)
 
-            print("Check X info:")
+            print("Check X info: ")
             print(X.head())
-            print("Check y info:")
+            print("X columns: ")
+            print(X.columns)
+            print("Check y info: ")
             print(y.head())
+
+            
+            print(f"Type of X: {type(X)}")
+            print(f"Type of y: {type(y)}")
 
             # Prepare the data
             X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
@@ -283,6 +321,20 @@ def main():
             print(f"y_encoded shape: {y_encoded.shape}")
             print(f"Number of classes: {num_classes}")
             
+            
+            try:
+                print(f"Type of X: {type(X)}")
+                print(f"Type of y: {type(y)}")
+                print(f"Type of X_scaled: {type(X_scaled)}")
+                print(f"Type of y_encoded: {type(y_encoded)}")
+
+                # Check specific variables
+                print(f"X_scaled sample: {X_scaled[0]}")
+                print(f"y_encoded sample: {y_encoded[0]}")
+            except Exception as e:
+                print(f"An error occurred while debugging types: {e}")     
+                       
+
             y_encoded_one_hot = to_categorical(y_encoded, num_classes=num_classes)
             print(f"y_encoded_one_hot shape: {y_encoded_one_hot.shape}")
 
@@ -291,14 +343,9 @@ def main():
             else:
                 print("Error in data preparation")
                 raise ValueError("X_scaled or y_encoded is None")
-        
-            model, history = build_and_train_model(X_train, y_train, X_test, y_test, X_scaled.shape[1], num_classes)
-    
-            # Print training history (optional)
-            # print("Training history:")
-            # for key in history.history.keys():
-            #     print(f"{key}: {history.history[key]}")
 
+            model, history = build_and_train_model(X_train, y_train, X_test, y_test, X_scaled.shape[1], num_classes)
+            
             while True:
                 try:
                     prompt_for_start_predictor = get_input_with_timeout("Would you like to predict a genre (Y/N)? ")
@@ -376,3 +423,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
