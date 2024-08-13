@@ -12,10 +12,13 @@ visualizations/*
 !visualizations/_viz.md
 !visualizations/_test_audio_waveform_spectogram
 
+# DF OUTPUTS
 df_output/*
 df_output/_default.xlsx
+df_output/v3_full_kde.csv
 !df_output
 !df_output/_df_output.md
 
-# DF OUTPUTS
-df_output/v3_full_kde.csv
+# PICKLES
+pickles/*
+!pickles

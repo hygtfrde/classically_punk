@@ -2,7 +2,8 @@ import ast
 import threading
 import queue
 import sys
-import json
+import os
+import pickle
 
 import tensorflow as tf
 import numpy as np
@@ -210,9 +211,28 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     print(f"Accuracy: {accuracy:.2f}%")
     print(f"Correct: {correct_count}, Incorrect: {incorrect_count}")
 
-    sys.stdout.write("\n")
-    sys.stdout.flush()
-    sys.exit()
+
+def save_encoder_and_scaler(encoder, scaler, encoder_path='pickles/encoder.pkl', scaler_path='pickles/scaler.pkl'):
+    try:
+        with open(encoder_path, 'wb') as enc_file:
+            pickle.dump(encoder, enc_file)
+        with open(scaler_path, 'wb') as scal_file:
+            pickle.dump(scaler, scal_file)
+        print("Encoder and scaler saved successfully.")
+    except Exception as e:
+        print(f"Error saving encoder and scaler: {e}")
+        
+
+def save_data(X_scaled, y, X_scaled_path='pickles/X_scaled.pkl', y_path='pickles/y.pkl'):
+    try:
+        with open(X_scaled_path, 'wb') as x_file:
+            pickle.dump(X_scaled, x_file)
+        with open(y_path, 'wb') as y_file:
+            pickle.dump(y, y_file)
+        print("Data saved successfully.")
+    except Exception as e:
+        print(f"Error saving data: {e}")
+
     
     
     
@@ -284,7 +304,7 @@ def main():
                     if prompt_for_start_predictor == 'Y':
                         row_input = get_input_with_timeout(f"Enter a row number (0 to {len(df_extract) - 1}), or Q to skip: ")
                         if row_input == 'Q':
-                            break  # Exit the loop if the user wants to skip
+                            break
 
                         try:
                             row_num = int(row_input)
@@ -307,11 +327,11 @@ def main():
                             predicted_class = predict(model, encoder, scaler, example_feature_inputs)
                             print(f"Predicted class: {predicted_class}")
                         elif confirm == 'Q':
-                            break  # Exit the loop if the user wants to quit
+                            break
                         elif confirm != 'N':
                             print("Invalid input. Please enter Y or N, or use Q to quit.")
                     elif prompt_for_start_predictor == 'N':
-                        break  # Exit the loop if the user does not want to predict a genre
+                        break
                     else:
                         print("Invalid input. Please enter Y or N.")
                 except Exception as e:
@@ -321,12 +341,37 @@ def main():
    
         # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
+        
+        # Save Pickles
+        try:
+            pickle_dir = 'pickles'
+            if not os.path.exists(pickle_dir):
+                os.makedirs(pickle_dir)
+                print(f"Directory '{pickle_dir}' created.")
+            else:
+                print(f"Directory '{pickle_dir}' already exists.")
+            
+            model_path = os.path.join(pickle_dir, 'trained_model.pkl')
+            
+            with open(model_path, 'wb') as model_file:
+                pickle.dump(model, model_file)
+            
+            save_encoder_and_scaler(encoder, scaler)
+            save_data(X_scaled, y)
+            
+            print(f"Model saved to '{model_path}'")
+        except Exception as e:
+            print(f"Error in Pickle: {e}")
+
+    
         sys.stdout.write("\n")
         sys.stdout.flush()
         sys.exit()
         
+        
     except Exception as e:
         print(f"An error occurred in main block: {e}")
+    
 
 if __name__ == '__main__':
     main()
