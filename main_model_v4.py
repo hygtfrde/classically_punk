@@ -133,7 +133,10 @@ def prepare_data(X, y, categories):
         X_flattened = X.apply(lambda col: col.apply(lambda x: x.flatten()))
 
         # Step 2: Convert the DataFrame of flattened arrays into a 2D NumPy array
-        X_stacked = np.stack(X_flattened.apply(np.concatenate, axis=1).to_numpy())
+        # X_stacked = np.stack(X_flattened.apply(np.concatenate, axis=1).to_numpy())
+        # Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]`
+        X_stacked = np.stack(X_flattened.apply(lambda x: np.concatenate(x)).to_numpy())
+
 
         # Step 3: Scale the features
         scaler = StandardScaler()
