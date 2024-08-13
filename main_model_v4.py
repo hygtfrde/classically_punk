@@ -45,7 +45,6 @@ def read_large_csv_in_chunks(csv_path):
     chunks = []
     try:
         for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
-            # Apply conversion on each chunk
             for col in chunk.columns:
                 if col not in ['filename', 'genre']:
                     chunk[col] = chunk[col].apply(convert_string_to_array)
@@ -53,8 +52,6 @@ def read_large_csv_in_chunks(csv_path):
         
         # Concatenate chunks
         df = pd.concat(chunks, ignore_index=True)
-        # X = df.drop(columns=['filename', 'genre'])
-        # y = df['genre']
         return df
     
     except Exception as e:
@@ -77,11 +74,6 @@ def convert_string_to_array(value):
                 if isinstance(value, list):
                     # Convert list to numpy array
                     value = np.array(value, dtype=float)
-                    
-                    # Flatten if it's a 2D array with one row
-                    # if value.ndim == 2 and value.shape[0] == 1:
-                    #     value = value.flatten()
-                    
                     print(f"Converted array shape: {value.shape}")
                     return value
                 else:
@@ -117,11 +109,8 @@ def read_raw_str_csv_and_split_df(csv_path):
             if col not in ['filename', 'genre', 'harmony', 'perceptr', 'tempo']:
                 df_input[col] = df_input[col].apply(convert_string_to_array)
         
-        X = df_input.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
-        # y = df_input['genre']
-
-        # Check shapes and types of the X values
         print('BEGIN SHAPE TEST ----------------------------------------------------- ')
+        X = df_input.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
         for col in X.columns:
             print(f"Column '{col}', dtype: {X[col].dtype}")
             for value in X[col].head(5):
@@ -180,18 +169,15 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
     return model, history
 
 def predict(model, encoder, scaler, feature_inputs):
-    # Convert feature_inputs to DataFrame
-    feature_df = pd.DataFrame([feature_inputs], columns=scaler.feature_names_in_)
-    
-    # Preprocess the feature inputs
-    features_scaled = scaler.transform(feature_df)
+    # Scale the feature inputs directly without converting to DataFrame
+    feature_inputs_scaled = scaler.transform([feature_inputs])
     
     # Make predictions
-    predictions = model.predict(features_scaled)
+    predictions = model.predict(feature_inputs_scaled)
     
     # Decode the predictions to category names
     predicted_class_index = np.argmax(predictions, axis=1)[0]
-    predicted_class = encoder.categories_[0][predicted_class_index]
+    predicted_class = encoder.inverse_transform([predicted_class_index])[0]
     
     return predicted_class
 
@@ -203,8 +189,8 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     
     for i in range(total_count):
         # Extract feature inputs and true label
-        feature_inputs = X.iloc[i].values
-        true_label = y.iloc[i]
+        feature_inputs = X[i]  # Use standard NumPy indexing
+        true_label = y[i]  # Use standard NumPy indexing
         
         # Make prediction
         predicted_class = predict(model, encoder, scaler, feature_inputs)
@@ -227,12 +213,12 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     sys.stdout.write("\n")
     sys.stdout.flush()
     sys.exit()
-    # return accuracy, correct_count, incorrect_count
+    
+    
+    
+    
+# --------------------- MAIN
 # -----------------------------------------------------------------------------------------
-
-
-
-
 
 def main():
     full_xtract = 'df_output/v4_encoded_strings.csv'
@@ -250,11 +236,11 @@ def main():
         thread.join(timeout)
         
         if thread.is_alive():
-            # Timeout occurred, we assume the user did not respond
+            # Timeout occurred
             return 'N'
         else:
             return input_queue.get().strip().upper()
-
+ 
     try:
         df_extract = read_raw_str_csv_and_split_df(full_xtract)
         
@@ -280,21 +266,18 @@ def main():
             print(f"y_encoded_one_hot shape: {y_encoded_one_hot.shape}")
 
             if X_scaled is not None and y_encoded is not None:
-                # Proceed with train-test split
                 X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_encoded_one_hot, test_size=0.2, random_state=42)
             else:
                 print("Error in data preparation")
                 raise ValueError("X_scaled or y_encoded is None")
         
-            # Build and train model
             model, history = build_and_train_model(X_train, y_train, X_test, y_test, X_scaled.shape[1], num_classes)
-            
+    
             # Print training history (optional)
             # print("Training history:")
             # for key in history.history.keys():
             #     print(f"{key}: {history.history[key]}")
 
-            # Make Predictions with user input for row or song to test
             while True:
                 try:
                     prompt_for_start_predictor = get_input_with_timeout("Would you like to predict a genre (Y/N)? ")
@@ -309,11 +292,10 @@ def main():
                                 raise ValueError("Row number is out of bounds.")
                         except ValueError as ve:
                             print(f"Error: {ve}")
-                            continue  # Prompt user again if row number input is invalid
+                            continue
 
-                        # Print the selected row from original DataFrame
-                        selected_row = X.iloc[row_num]  # Here, X should be a DataFrame for .iloc
-                        selected_genre = y.iloc[row_num]  # Assuming y is still a DataFrame or Series
+                        selected_row = X.iloc[row_num]  # Ensure X is still a DataFrame
+                        selected_genre = y.iloc[row_num]  # Ensure y is still a Series
                         print(f"Selected row:\n{selected_row}")
                         print(f"Selected genre:\n{selected_genre}")
 
@@ -321,7 +303,7 @@ def main():
                         confirm = get_input_with_timeout("Do you want to use this song data for prediction? (Y/N), Enter for Y, or Q to quit: ")
                         if confirm in ('Y', ''):
                             # Make prediction
-                            example_feature_inputs = selected_row.values  # Use .values for DataFrame to get array
+                            example_feature_inputs = selected_row.values  # Use .values for NumPy array
                             predicted_class = predict(model, encoder, scaler, example_feature_inputs)
                             print(f"Predicted class: {predicted_class}")
                         elif confirm == 'Q':
@@ -336,7 +318,7 @@ def main():
                     print(f"An error occurred in prediction block: {e}")
         else:
             print("Error: DataFrame is None")
-    
+   
         # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
         sys.stdout.write("\n")
@@ -345,9 +327,6 @@ def main():
         
     except Exception as e:
         print(f"An error occurred in main block: {e}")
-
-
-
 
 if __name__ == '__main__':
     main()
