@@ -45,17 +45,18 @@ class MusicDataProcessor:
             print(f"Directory '{df_output_dir}' already exists.")
 
     def get_data(self):
-        # Convert the dataframe to a dictionary, converting numpy arrays to lists
-        data_dict = self.data.applymap(lambda x: x.tolist() if isinstance(x, np.ndarray) else x).to_dict(orient='records')
+        def encode_array(x):
+            if isinstance(x, np.ndarray):
+                return json.dumps(x.tolist())  # Convert the array to a JSON string
+            return x
+
+        # Apply the encoding to all elements in the DataFrame
+        encoded_df = self.data.applymap(encode_array)
         
-        # Save the dictionary as a JSON string to avoid truncation issues
-        json_output = json.dumps(data_dict)
+        # Save the DataFrame to CSV
+        encoded_df.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
         
-        # Write the JSON string to a CSV file
-        with open(f'{df_output_dir}/{self.file_output_name}.csv', 'w') as file:
-            file.write(json_output)
-            
-        return self.data
+        return encoded_df
 
     def compute_stats_and_measures(self, data):
         # Compute basic statistics
@@ -180,7 +181,7 @@ def main():
     
     dataset_path = 'genres'  # Replace with the path to your audio dataset
     file_depth_limit = 1  # Number of files to process per genre
-    file_output_name = 'v4_new_getdata()'  # Name for the output CSV file
+    file_output_name = 'v4_encoded_strings'
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(

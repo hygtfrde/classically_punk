@@ -2,6 +2,7 @@ import ast
 import threading
 import queue
 import sys
+import json
 
 import tensorflow as tf
 import numpy as np
@@ -16,8 +17,8 @@ RED = '\033[31m'
 RESET = '\033[0m'
 
 
-
-def convert_string_to_array(string):
+# -----------------------------------------------------------------------------------------
+def convert_string_to_array0(string):
     try:
         list_of_floats = ast.literal_eval(string)
         return np.array(list_of_floats, dtype=float)  # Ensure float type
@@ -31,7 +32,73 @@ def read_csv_and_split_df(csv_path):
     X = df.drop(columns=['filename', 'genre'])  # Drop non-feature columns
     y = df['genre']  # Target column
     return X, y
+# -----------------------------------------------------------------------------------------
 
+
+def convert_string_to_array(value):
+    # If the value is a string and starts with a single or double quote, strip the quotes
+    if isinstance(value, str) and (value.startswith('"') or value.startswith("'")):
+        value = value.strip('"').strip("'")
+        try:
+            # Try to convert the string to a list or numpy array
+            value = ast.literal_eval(value)
+            if isinstance(value, list):
+                return np.array(value)
+        except (ValueError, SyntaxError):
+            pass  # Return the original value if it can't be converted
+    return value
+
+def convert_string_df_to_array(df_input):
+    # Apply the conversion to each cell in the DataFrame
+    for col in df_input.columns:
+        df_input[col] = df_input[col].apply(convert_string_to_array)
+    
+    return df_input
+
+
+def convert_string_df_to_array(df_input):
+    # if starts with single ' quote or double " quote
+    # then remove or strip quotes off
+    # allow for long processing times, perhaps asynchronously
+    # ensure that: order of rows must be preserved to map correctly to original
+    
+    
+    if isinstance(value, str) and (value.startswith('[') or value.startswith("[")):
+        try:
+            list_of_np_arrs = ast.literal_eval(value)
+            if isinstance(list_of_np_arrs, list) and isinstance(list_of_np_arrs[0], list):
+                return np.array(list_of_np_arrs, dtype=float)  # Convert to 2D numpy array
+            else:
+                return np.array(list_of_np_arrs, dtype=float)  # Convert to 1D numpy array
+        except (ValueError, SyntaxError) as e:
+            print(f"{RED}Error converting string to array: {e}{RESET}")
+            return np.array([])
+    return value
+
+def read_raw_str_csv_and_split_df(csv_path):
+    try:
+        df = pd.read_csv(csv_path)
+
+        # Apply stripping quotes and conversion to numpy arrays
+        for col in df.columns:
+            if col not in ['filename', 'genre']:
+                df[col] = df[col].apply(lambda x: convert_string_to_array(x))
+        
+        # Separate features and target
+        X = df.drop(columns=['filename', 'genre'])
+        y = df['genre']
+        
+        return X, y
+    except Exception as e:
+        print(f"Error processing CSV: {e}")
+        return None, None
+    
+    
+
+
+
+
+# -----------------------------------------------------------------------------------------
 
 def prepare_data(X, y, categories):
     encoder = OneHotEncoder(sparse_output=False, categories=[categories])
@@ -110,17 +177,14 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     sys.stdout.flush()
     sys.exit()
     # return accuracy, correct_count, incorrect_count
-    
+# -----------------------------------------------------------------------------------------
 
 
 
 
 
 def main():
-    full_xtract = 'df_output/v3_full_no_kde.csv'
-    test_csv_path = 'df_output/test_1.csv'
-    
-    _2d_numpy = 'df_output/v4_new_getdata().csv'
+    full_xtract = 'df_output/v4_encoded_strings.csv'
     
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)
@@ -141,8 +205,9 @@ def main():
             return input_queue.get().strip().upper()
     
     try:
-        # Read and prepare data
-        X, y = read_csv_and_split_df(_2d_numpy)
+        # For numerical CSV: read_csv_and_split_df
+        # For raw string CSV: read_raw_str_csv_and_split_df
+        X, y = read_raw_str_csv_and_split_df(full_xtract)
         categories = y.unique()
         num_classes = len(categories)
         X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
