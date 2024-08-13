@@ -1,6 +1,6 @@
 import os
 import pickle
-from main_model_v4 import evaluate_all_rows, predict  
+from v4.main_model_v4 import evaluate_all_rows, predict  
 
 
 def load_model(pickle_file_path):
