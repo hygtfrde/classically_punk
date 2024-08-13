@@ -109,11 +109,9 @@ class MusicDataProcessor:
             
             if self.extract_raw_only is not None and self.extract_raw_only:
                 np.savez(f'{df_output_dir}/raw_features_{self.file_output_name}.npz', **features)
-                
                 if verbose == 'v':
                     for name, array in features.items():
                         print(f"{name.capitalize()} Shape: {array.shape}")
-                
                 return features
 
             # Compute statistics for each feature
@@ -180,8 +178,8 @@ def main():
     start_time = time.time()
     
     dataset_path = 'genres'  # Replace with the path to your audio dataset
-    file_depth_limit = 1  # Number of files to process per genre
-    file_output_name = 'v4_encoded_strings'
+    file_depth_limit = None  # Number of files to process per genre
+    file_output_name = 'v4_full_huge'
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(

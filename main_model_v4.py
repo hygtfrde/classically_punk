@@ -20,6 +20,7 @@ RED = '\033[31m'
 RESET = '\033[0m'
 
 
+# This model is designed for the raw audio data, not stats features
 # -----------------------------------------------------------------------------------------
 # V0
 def convert_string_to_array_v0(string):
@@ -241,7 +242,7 @@ def save_data(X_scaled, y, X_scaled_path='pickles/X_scaled.pkl', y_path='pickles
 # -----------------------------------------------------------------------------------------
 
 def main():
-    full_xtract = 'df_output/v4_encoded_strings.csv'
+    full_xtract = 'df_output/v4_full_huge.csv'
     
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)
