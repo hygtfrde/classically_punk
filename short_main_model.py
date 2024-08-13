@@ -25,14 +25,11 @@ def convert_string_to_array(value):
     try:
         print(f"Processing value of type: {type(value)}")
         print(f"Value starts with: {str(value)[:50]}")
-        
         if isinstance(value, str):
             value = value.strip('"').strip("'")
             try:
                 value = ast.literal_eval(value)
-                
                 if isinstance(value, list):
-                    # Convert list to numpy array
                     value = np.array(value, dtype=float)
                     print(f"Converted array shape: {value.shape}")
                     return value
@@ -42,14 +39,11 @@ def convert_string_to_array(value):
                 print(f"Error evaluating string: {e}")
         else:
             print('Value not detected as str')
-        
         return value
     except Exception as e:
         print("General failure in conversion:")
         print(f'Error: {e}')
-        return value
-
-
+        return np.array([])
 
 def read_raw_str_csv_and_split_df(csv_path):
     try:
@@ -57,7 +51,6 @@ def read_raw_str_csv_and_split_df(csv_path):
     except Exception as e:
         print(f"Error reading csv into df: {e}")
         return None, None
-    
     if df_input is not None:
         for col in df_input.columns:
             print(f"Column '{col}' data type: {df_input[col].dtype}")
@@ -65,7 +58,7 @@ def read_raw_str_csv_and_split_df(csv_path):
             for value in df_input[col].head(5):
                 print(f"{str(value)[:50]}")
             print()
-            
+            # REMOVE 'harmony', 'perceptr', 'tempo' for incorrect shapes
             if col not in ['filename', 'genre', 'harmony', 'perceptr', 'tempo']:
                 df_input[col] = df_input[col].apply(convert_string_to_array)
         
@@ -85,6 +78,9 @@ def read_raw_str_csv_and_split_df(csv_path):
 
 
 def pad_or_truncate(array, target_shape):
+    if len(array.shape) < 2:  # Check if it's a 1D array
+        array = np.expand_dims(array, axis=1)  # Convert to 2D if necessary
+    
     if array.shape[1] < target_shape[1]:
         padding = ((0, 0), (0, target_shape[1] - array.shape[1]))
         return np.pad(array, padding, mode='constant')
@@ -94,12 +90,13 @@ def pad_or_truncate(array, target_shape):
         return array
 
 
+
 def process_data(X, y, target_shape):
     # Ensure X is numeric and consistent in shape
-    X_numeric = X.apply(lambda col: np.array([np.array(x) for x in col]))
-    X_padded = X_numeric.apply(lambda col: pad_or_truncate(np.array(col.tolist()), target_shape))
+    X_numeric = X.apply(lambda col: np.array([np.array(x) for x in col if isinstance(x, list)]))
     
     # Flatten if necessary
+    X_padded = X_numeric.apply(lambda col: pad_or_truncate(np.array(col.tolist()), target_shape))
     X_flattened = X_padded.apply(lambda col: np.array([x.flatten() for x in col]))
 
     # Convert to NumPy array
@@ -113,41 +110,54 @@ def process_data(X, y, target_shape):
 
 
 
+
 def normalize_array_lengths(X, target_length):
     return X.map(lambda x: pad_or_truncate(x, target_length))
 
-def find_min_length(X):
-    # Check that this function is returning an integer
-    lengths = [arr.shape[1] for arr in X if isinstance(arr, np.ndarray)]
+def find_min_length(arrays):
+    lengths = [arr.shape[1] for arr in arrays if arr.ndim == 2]
     min_length = min(lengths) if lengths else 0
-    print(f"find_min_length - lengths: {lengths}, min_length: {min_length}")
     return min_length
 
-def truncate_to_min_length(X, min_length):
-    truncated_X = [arr[:, :min_length] if arr.shape[1] > min_length else arr for arr in X]
-    print(f"truncate_to_min_length - min_length: {min_length}")
-    return np.array(truncated_X)
+def truncate_to_min_length(arrays, min_length):
+    truncated_arrays = [arr[:, :min_length] if arr.shape[1] > min_length else arr for arr in arrays]
+    return np.stack(truncated_arrays) if truncated_arrays else np.array([])
 
 def prepare_data(X, y, categories):
     try:
         # Ensure X contains NumPy arrays
         for col in X.columns:
-            X[col] = X[col].apply(lambda x: np.array(x) if isinstance(x, list) else x)
+            X[col] = X[col].apply(lambda x: np.array(x) if isinstance(x, list) else np.array([]))
         
         # Verify if conversion was successful
         for col in X.columns:
             if not all(isinstance(val, np.ndarray) for val in X[col]):
                 print(f"Column '{col}' contains non-NumPy array values.")
         
+        # Flatten arrays within each column
+        flattened_X = []
+        for col in X.columns:
+            flattened_X.extend(X[col].values)
+        
+        # Ensure we only work with 2D arrays
+        flattened_X = [arr for arr in flattened_X if arr.ndim == 2]
+        
         # Find minimum length for truncation
-        min_length = find_min_length(X.values.flatten())
+        min_length = find_min_length(flattened_X)
         print(f"min_length: {min_length}")
 
         # Truncate data to minimum length
-        X_truncated = truncate_to_min_length(X.values.flatten(), min_length)
-        num_samples, num_features = X_truncated.shape
-        print(f"X_truncated shape: {X_truncated.shape}")
-
+        X_truncated = truncate_to_min_length(flattened_X, min_length)
+        if isinstance(X_truncated, np.ndarray):
+            num_samples, num_features = X_truncated.shape
+            print(f"X_truncated shape: {X_truncated.shape}")
+        else:
+            print("X_truncated is not a NumPy array")
+        if hasattr(X_truncated, 'shape') and len(X_truncated.shape) == 2:
+            num_samples, num_features = X_truncated.shape
+        else:
+            print("X_truncated does not have the expected shape")
+        
         num_categories = len(categories)
         print(f"Number of categories: {num_categories}")
 
@@ -166,20 +176,19 @@ def prepare_data(X, y, categories):
 
 
 
+
+
 def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_classes):
     X_train = np.array(X_train, dtype=np.float32)
     y_train = np.array(y_train, dtype=np.float32)
     X_test = np.array(X_test, dtype=np.float32)
     y_test = np.array(y_test, dtype=np.float32)
 
-    # Print shapes and types for debugging
     print("X_train shape:", X_train.shape)
     print("y_train shape:", y_train.shape)
     print("X_test shape:", X_test.shape)
     print("y_test shape:", y_test.shape)
-    print("X_train dtype:", X_train.dtype)
-    print("y_train dtype:", y_train.dtype)
-    
+
     model = Sequential([
         Input(shape=(num_features,)),
         Dense(64, activation='relu'),
@@ -201,18 +210,14 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
 
 
 
+
 def predict(model, encoder, scaler, feature_inputs):
-    # Scale the feature inputs directly without converting to DataFrame
     feature_inputs_scaled = scaler.transform([feature_inputs])
-    
-    # Make predictions
     predictions = model.predict(feature_inputs_scaled)
-    
-    # Decode the predictions to category names
     predicted_class_index = np.argmax(predictions, axis=1)[0]
     predicted_class = encoder.inverse_transform([predicted_class_index])[0]
-    
     return predicted_class
+
 
 
 
@@ -314,6 +319,11 @@ def main():
             
             print(f"Type of X: {type(X)}")
             print(f"Type of y: {type(y)}")
+            print(f"Shapes of arrays in X:")
+            for col in X.columns:
+                for val in X[col]:
+                    if isinstance(val, np.ndarray):
+                        print(f"Column '{col}', shape: {val.shape}")
 
             # Prepare the data
             X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
