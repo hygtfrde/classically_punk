@@ -243,6 +243,7 @@ def save_data(X_scaled, y, X_scaled_path='pickles/X_scaled.pkl', y_path='pickles
 
 def main():
     full_xtract = 'df_output/v4_full_huge.csv'
+    file_limit_2 = 'df_output/v4_file_depth_2.csv'
     
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)
@@ -263,7 +264,7 @@ def main():
             return input_queue.get().strip().upper()
  
     try:
-        df_extract = read_raw_str_csv_and_split_df(full_xtract)
+        df_extract = read_raw_str_csv_and_split_df(file_limit_2)
         
         if df_extract is not None:
             # Split into X and y
