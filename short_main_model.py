@@ -1,13 +1,14 @@
 import ast
-import threading
-import queue
-import sys
-import os
 import pickle
+import os
+import sys
+import queue
+import threading
+from typing import List, Tuple, Optional, Dict
 
-import tensorflow as tf
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
@@ -20,175 +21,69 @@ RED = '\033[31m'
 RESET = '\033[0m'
 
 
+# --------------------- CONVERSIONS
+# -----------------------------------------------------------------------------------------
+def convert_string_to_array(value: str) -> np.ndarray:
+    if isinstance(value, str):
+        value = value.strip('"').strip("'")
+        try:
+            value = ast.literal_eval(value)
+            if isinstance(value, list):
+                return np.array(value, dtype=float)
+        except (ValueError, SyntaxError):
+            pass
+    return np.array([])
 
-def convert_string_to_array(value):
-    try:
-        print(f"Processing value of type: {type(value)}")
-        print(f"Value starts with: {str(value)[:50]}")
-        if isinstance(value, str):
-            value = value.strip('"').strip("'")
-            try:
-                value = ast.literal_eval(value)
-                if isinstance(value, list):
-                    value = np.array(value, dtype=float)
-                    print(f"Converted array shape: {value.shape}")
-                    return value
-                else:
-                    print("Warning: Evaluated value is not a list.")
-            except (ValueError, SyntaxError) as e:
-                print(f"Error evaluating string: {e}")
-        else:
-            print('Value not detected as str')
-        return value
-    except Exception as e:
-        print("General failure in conversion:")
-        print(f'Error: {e}')
-        return np.array([])
 
-def read_raw_str_csv_and_split_df(csv_path):
+def read_raw_str_csv_and_split_df(csv_path: str) -> Tuple[Optional[pd.DataFrame], Optional[pd.Series]]:
     try:
-        df_input = pd.read_csv(csv_path)
-    except Exception as e:
-        print(f"Error reading csv into df: {e}")
-        return None, None
-    if df_input is not None:
-        for col in df_input.columns:
-            print(f"Column '{col}' data type: {df_input[col].dtype}")
-            print(f"First 10 characters of values in column '{col}':")
-            for value in df_input[col].head(5):
-                print(f"{str(value)[:50]}")
-            print()
-            # REMOVE 'harmony', 'perceptr', 'tempo' for incorrect shapes
+        df = pd.read_csv(csv_path)
+        for col in df.columns:
             if col not in ['filename', 'genre', 'harmony', 'perceptr', 'tempo']:
-                df_input[col] = df_input[col].apply(convert_string_to_array)
-        
-        print('BEGIN SHAPE TEST ----------------------------------------------------- ')
-        X = df_input.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
-        for col in X.columns:
-            print(f"Column '{col}', dtype: {X[col].dtype}")
-            for value in X[col].head(5):
-                print(f"Value type: {type(value)}, Shape: {getattr(value, 'shape', 'N/A')}")
-        print('END SHAPE TEST ----------------------------------------------------- ')
-
-        return df_input
-    else:
-        print('Error: df_input is None')
+                df[col] = df[col].apply(convert_string_to_array)
+        return df, df['genre']
+    except Exception as e:
+        print(f"Error reading CSV or processing data: {e}")
         return None, None
-    
-
-
-def pad_or_truncate(array, target_shape):
-    if len(array.shape) < 2:  # Check if it's a 1D array
-        array = np.expand_dims(array, axis=1)  # Convert to 2D if necessary
-    
-    if array.shape[1] < target_shape[1]:
-        padding = ((0, 0), (0, target_shape[1] - array.shape[1]))
-        return np.pad(array, padding, mode='constant')
-    elif array.shape[1] > target_shape[1]:
-        return array[:, :target_shape[1]]
-    else:
-        return array
-
-
-
-def process_data(X, y, target_shape):
-    # Ensure X is numeric and consistent in shape
-    X_numeric = X.apply(lambda col: np.array([np.array(x) for x in col if isinstance(x, list)]))
-    
-    # Flatten if necessary
-    X_padded = X_numeric.apply(lambda col: pad_or_truncate(np.array(col.tolist()), target_shape))
-    X_flattened = X_padded.apply(lambda col: np.array([x.flatten() for x in col]))
-
-    # Convert to NumPy array
-    X_array = np.array(X_flattened.tolist())
-    
-    # One-hot encode y
-    encoder = OneHotEncoder(sparse=False)
-    y_encoded = encoder.fit_transform(y.reshape(-1, 1))
-    
-    return X_array, y_encoded
+# -----------------------------------------------------------------------------------------
 
 
 
 
-def normalize_array_lengths(X, target_length):
-    return X.map(lambda x: pad_or_truncate(x, target_length))
 
-def find_min_length(arrays):
-    lengths = [arr.shape[1] for arr in arrays if arr.ndim == 2]
-    min_length = min(lengths) if lengths else 0
-    return min_length
 
-def truncate_to_min_length(arrays, min_length):
-    truncated_arrays = [arr[:, :min_length] if arr.shape[1] > min_length else arr for arr in arrays]
-    return np.stack(truncated_arrays) if truncated_arrays else np.array([])
 
+
+
+
+
+
+
+# --------------------- MODEL
+# -----------------------------------------------------------------------------------------
 def prepare_data(X, y, categories):
     try:
-        # Ensure X contains NumPy arrays
-        for col in X.columns:
-            X[col] = X[col].apply(lambda x: np.array(x) if isinstance(x, list) else np.array([]))
-        
-        # Verify if conversion was successful
-        for col in X.columns:
-            if not all(isinstance(val, np.ndarray) for val in X[col]):
-                print(f"Column '{col}' contains non-NumPy array values.")
-        
-        # Flatten arrays within each column
-        flattened_X = []
-        for col in X.columns:
-            flattened_X.extend(X[col].values)
-        
-        # Ensure we only work with 2D arrays
-        flattened_X = [arr for arr in flattened_X if arr.ndim == 2]
-        
-        # Find minimum length for truncation
-        min_length = find_min_length(flattened_X)
-        print(f"min_length: {min_length}")
+        # Step 1: Flatten the features
+        X_flattened = X.apply(lambda col: col.apply(lambda x: x.flatten()))
 
-        # Truncate data to minimum length
-        X_truncated = truncate_to_min_length(flattened_X, min_length)
-        if isinstance(X_truncated, np.ndarray):
-            num_samples, num_features = X_truncated.shape
-            print(f"X_truncated shape: {X_truncated.shape}")
-        else:
-            print("X_truncated is not a NumPy array")
-        if hasattr(X_truncated, 'shape') and len(X_truncated.shape) == 2:
-            num_samples, num_features = X_truncated.shape
-        else:
-            print("X_truncated does not have the expected shape")
-        
-        num_categories = len(categories)
-        print(f"Number of categories: {num_categories}")
+        # Step 2: Convert the DataFrame of flattened arrays into a 2D NumPy array
+        X_stacked = np.stack(X_flattened.apply(np.concatenate, axis=1).to_numpy())
 
-        y_encoded = pd.get_dummies(y).values
-        print(f"y_encoded shape: {y_encoded.shape}")
-
-        encoder = LabelEncoder()
+        # Step 3: Scale the features
         scaler = StandardScaler()
-        
-        return X_truncated, y_encoded, encoder, scaler
+        X_scaled = scaler.fit_transform(X_stacked)
 
+        # Step 4: Encode the target labels (y)
+        encoder = LabelEncoder()
+        y_encoded = encoder.fit_transform(y)
+
+        return X_scaled, y_encoded, encoder, scaler
     except Exception as e:
         print(f"Error in prepare_data: {e}")
-        raise
-
-
-
-
-
-
-def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_classes):
-    X_train = np.array(X_train, dtype=np.float32)
-    y_train = np.array(y_train, dtype=np.float32)
-    X_test = np.array(X_test, dtype=np.float32)
-    y_test = np.array(y_test, dtype=np.float32)
-
-    print("X_train shape:", X_train.shape)
-    print("y_train shape:", y_train.shape)
-    print("X_test shape:", X_test.shape)
-    print("y_test shape:", y_test.shape)
-
+        return None, None, None, None
+    
+def build_and_train_model(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, y_test: np.ndarray, num_features: int, num_classes: int) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
+    """Build and train a neural network model."""
     model = Sequential([
         Input(shape=(num_features,)),
         Dense(64, activation='relu'),
@@ -196,29 +91,16 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
         Dense(num_classes, activation='softmax')
     ])
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-    
-    history = model.fit(
-        X_train, 
-        y_train, 
-        epochs=300, 
-        batch_size=128, 
-        validation_data=(X_test, y_test),
-        verbose=1
-    )
-    
+    history = model.fit(X_train, y_train, epochs=300, batch_size=128, validation_data=(X_test, y_test), verbose=1)
     return model, history
 
 
-
-
-def predict(model, encoder, scaler, feature_inputs):
+def predict(model: tf.keras.Model, encoder: LabelEncoder, scaler: StandardScaler, feature_inputs: np.ndarray) -> str:
+    """Predict the class of a given input using the trained model."""
     feature_inputs_scaled = scaler.transform([feature_inputs])
     predictions = model.predict(feature_inputs_scaled)
     predicted_class_index = np.argmax(predictions, axis=1)[0]
-    predicted_class = encoder.inverse_transform([predicted_class_index])[0]
-    return predicted_class
-
-
+    return encoder.inverse_transform([predicted_class_index])[0]
 
 
 def evaluate_all_rows(model, X, y, encoder, scaler):
@@ -248,6 +130,14 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     print(f"Accuracy: {accuracy:.2f}%")
     print(f"Correct: {correct_count}, Incorrect: {incorrect_count}")
 
+
+# --------------------- PICKLE
+# -----------------------------------------------------------------------------------------
+def save_pickle(obj: object, path: str) -> None:
+    """Save an object to a pickle file."""
+    with open(path, 'wb') as file:
+        pickle.dump(obj, file)
+        
 
 def save_encoder_and_scaler(encoder, scaler, encoder_path='pickles/encoder.pkl', scaler_path='pickles/scaler.pkl'):
     try:
@@ -284,11 +174,9 @@ def main():
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)
         input_queue = queue.Queue()
-        
         def input_thread():
             user_input = input()
             input_queue.put(user_input)
-        
         thread = threading.Thread(target=input_thread)
         thread.start()
         thread.join(timeout)
@@ -298,52 +186,20 @@ def main():
             return 'N'
         else:
             return input_queue.get().strip().upper()
- 
+
     try:
-        df_extract = read_raw_str_csv_and_split_df(file_limit_2)
+        # Read and split the data
+        df_extract, y = read_raw_str_csv_and_split_df(file_limit_2)
 
         if df_extract is not None:
             # Split into X and y
             X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
-            y = df_extract['genre']
             categories = y.unique()
             num_classes = len(categories)
 
-            print("Check X info: ")
-            print(X.head())
-            print("X columns: ")
-            print(X.columns)
-            print("Check y info: ")
-            print(y.head())
-
-            
-            print(f"Type of X: {type(X)}")
-            print(f"Type of y: {type(y)}")
-            print(f"Shapes of arrays in X:")
-            for col in X.columns:
-                for val in X[col]:
-                    if isinstance(val, np.ndarray):
-                        print(f"Column '{col}', shape: {val.shape}")
-
             # Prepare the data
             X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
-            print("=======================> X AND Y SUCCESS")
-            print(f"y_encoded shape: {y_encoded.shape}")
-            print(f"Number of classes: {num_classes}")
-            
-            
-            try:
-                print(f"Type of X: {type(X)}")
-                print(f"Type of y: {type(y)}")
-                print(f"Type of X_scaled: {type(X_scaled)}")
-                print(f"Type of y_encoded: {type(y_encoded)}")
 
-                # Check specific variables
-                print(f"X_scaled sample: {X_scaled[0]}")
-                print(f"y_encoded sample: {y_encoded[0]}")
-            except Exception as e:
-                print(f"An error occurred while debugging types: {e}")     
-                       
 
             y_encoded_one_hot = to_categorical(y_encoded, num_classes=num_classes)
             print(f"y_encoded_one_hot shape: {y_encoded_one_hot.shape}")
@@ -397,10 +253,12 @@ def main():
         else:
             print("Error: DataFrame is None")
    
-        # Evaluate model
+
+
+        # --------------------- Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
         
-        # Save Pickles
+        # --------------------- Save Pickles
         try:
             pickle_dir = 'pickles'
             if not os.path.exists(pickle_dir):
@@ -429,8 +287,37 @@ def main():
         
     except Exception as e:
         print(f"An error occurred in main block: {e}")
+# -----------------------------------------------------------------------------------------
+
+
+
+def not_main():
+    test_xtract = 'df_output/v4_file_depth_2.csv'
     
+    df_extract, y = read_raw_str_csv_and_split_df(test_xtract)
+    X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+    categories = y.unique()
+    num_classes = len(categories)
+    
+    print("Check X info: ")
+    print(X.head())
+    print("X columns: ")
+    print(X.columns)
+    print("Check y info: ")
+    print(y.head())
+
+    print(f"Type of X: {type(X)}")
+    print(f"Type of y: {type(y)}")
+    print(f"Shapes of arrays in X BEFORE preparation:")
+    for col in X.columns:
+        for val in X[col]:
+            if isinstance(val, np.ndarray):
+                print(f"Column '{col}', shape: {val.shape}")
+            elif not isinstance(val, np.ndarray):
+                print(f"{RED}NOT NP ARRAY{RESET} -> Column '{col}', shape: {val.shape}")
+
 
 if __name__ == '__main__':
-    main()
+    not_main()
+
 
