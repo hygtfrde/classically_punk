@@ -1,66 +1,86 @@
 import ast
-import pickle
-import os
-import sys
-import queue
 import threading
-from typing import List, Tuple, Optional, Dict
+import queue
+import sys
+import os
+import pickle
 
+import tensorflow as tf
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Input
 from tensorflow.keras.utils import to_categorical
 
-
-GREEN = '\033[32m'
-RED = '\033[31m'
-RESET = '\033[0m'
+from CONSTANTS import RED, GREEN, RESET
 
 
-# --------------------- CONVERSIONS
-# -----------------------------------------------------------------------------------------
-def convert_string_to_array(value: str) -> np.ndarray:
-    if isinstance(value, str):
-        value = value.strip('"').strip("'")
-        try:
-            value = ast.literal_eval(value)
-            if isinstance(value, list):
-                return np.array(value, dtype=float)
-        except (ValueError, SyntaxError):
-            pass
-    return np.array([])
-
-
-def read_raw_str_csv_and_split_df(csv_path: str) -> Tuple[Optional[pd.DataFrame], Optional[pd.Series]]:
+def convert_string_to_array(value):
     try:
-        df = pd.read_csv(csv_path)
-        for col in df.columns:
-            if col not in ['filename', 'genre', 'harmony', 'perceptr', 'tempo']:
-                df[col] = df[col].apply(convert_string_to_array)
-        return df, df['genre']
+        print(f"Processing value of type: {type(value)}")
+        print(f"Value starts with: {str(value)[:50]}")
+        
+        if isinstance(value, str):
+            value = value.strip('"').strip("'")
+            try:
+                value = ast.literal_eval(value)
+                
+                if isinstance(value, list):
+                    # Convert list to numpy array
+                    value = np.array(value, dtype=float)
+                    print(f"Converted array shape: {value.shape}")
+                    return value
+                else:
+                    print("Warning: Evaluated value is not a list.")
+            except (ValueError, SyntaxError) as e:
+                print(f"Error evaluating string: {e}")
+        else:
+            print('Value not detected as str')
+        
+        return value
     except Exception as e:
-        print(f"Error reading CSV or processing data: {e}")
+        print("General failure in conversion:")
+        print(f'Error: {e}')
+        return value
+
+
+
+def read_raw_str_csv_and_split_df(csv_path):
+    try:
+        df_input = pd.read_csv(csv_path)
+    except Exception as e:
+        print(f"Error reading csv into df: {e}")
         return None, None
-# -----------------------------------------------------------------------------------------
+    
+    if df_input is not None:
+        for col in df_input.columns:
+            print(f"Column '{col}' data type: {df_input[col].dtype}")
+            print(f"First 10 characters of values in column '{col}':")
+            for value in df_input[col].head(5):
+                print(f"{str(value)[:50]}")
+            print()
+            
+            if col not in ['filename', 'genre', 'harmony', 'perceptr', 'tempo']:
+                df_input[col] = df_input[col].apply(convert_string_to_array)
+        
+        print('BEGIN SHAPE TEST ----------------------------------------------------- ')
+        X = df_input.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+        for col in X.columns:
+            print(f"Column '{col}', dtype: {X[col].dtype}")
+            for value in X[col].head(5):
+                print(f"Value type: {type(value)}, Shape: {getattr(value, 'shape', 'N/A')}")
+        print('END SHAPE TEST ----------------------------------------------------- ')
+
+        return df_input
+    else:
+        print('Error: df_input is None')
+        return None, None
+    
 
 
 
-
-
-
-
-
-
-
-
-
-
-# --------------------- MODEL
-# -----------------------------------------------------------------------------------------
 def prepare_data(X, y, categories):
     try:
         # Step 1: Flatten the features
@@ -82,8 +102,9 @@ def prepare_data(X, y, categories):
         print(f"Error in prepare_data: {e}")
         return None, None, None, None
     
-def build_and_train_model(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, y_test: np.ndarray, num_features: int, num_classes: int) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
-    """Build and train a neural network model."""
+
+
+def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_classes):
     model = Sequential([
         Input(shape=(num_features,)),
         Dense(64, activation='relu'),
@@ -91,16 +112,31 @@ def build_and_train_model(X_train: np.ndarray, y_train: np.ndarray, X_test: np.n
         Dense(num_classes, activation='softmax')
     ])
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-    history = model.fit(X_train, y_train, epochs=300, batch_size=128, validation_data=(X_test, y_test), verbose=1)
+    
+    history = model.fit(
+        X_train, 
+        y_train, 
+        epochs=300, 
+        batch_size=128, 
+        validation_data=(X_test, y_test),
+        verbose=1
+    )
+    
     return model, history
 
-
-def predict(model: tf.keras.Model, encoder: LabelEncoder, scaler: StandardScaler, feature_inputs: np.ndarray) -> str:
-    """Predict the class of a given input using the trained model."""
+def predict(model, encoder, scaler, feature_inputs):
+    # Scale the feature inputs directly without converting to DataFrame
     feature_inputs_scaled = scaler.transform([feature_inputs])
+    
+    # Make predictions
     predictions = model.predict(feature_inputs_scaled)
+    
+    # Decode the predictions to category names
     predicted_class_index = np.argmax(predictions, axis=1)[0]
-    return encoder.inverse_transform([predicted_class_index])[0]
+    predicted_class = encoder.inverse_transform([predicted_class_index])[0]
+    
+    return predicted_class
+
 
 
 def evaluate_all_rows(model, X, y, encoder, scaler):
@@ -131,14 +167,6 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     print(f"Correct: {correct_count}, Incorrect: {incorrect_count}")
 
 
-# --------------------- PICKLE
-# -----------------------------------------------------------------------------------------
-def save_pickle(obj: object, path: str) -> None:
-    """Save an object to a pickle file."""
-    with open(path, 'wb') as file:
-        pickle.dump(obj, file)
-        
-
 def save_encoder_and_scaler(encoder, scaler, encoder_path='pickles/encoder.pkl', scaler_path='pickles/scaler.pkl'):
     try:
         with open(encoder_path, 'wb') as enc_file:
@@ -168,15 +196,18 @@ def save_data(X_scaled, y, X_scaled_path='pickles/X_scaled.pkl', y_path='pickles
 # -----------------------------------------------------------------------------------------
 
 def main():
-    full_xtract = 'df_output/v4_full_huge.csv'
-    file_limit_2 = 'df_output/v4_file_depth_2.csv'
+    full_xtract = 'df_output/v4_encoded_strings.csv'
+    stable_xtract = 'df_output/v4_encoded_strings_stable.csv'
+    v5_3_file = 'df_output/v5_3_file.csv'
     
     def get_input_with_timeout(prompt, timeout=15):
         print(prompt, end='', flush=True)
         input_queue = queue.Queue()
+        
         def input_thread():
             user_input = input()
             input_queue.put(user_input)
+        
         thread = threading.Thread(target=input_thread)
         thread.start()
         thread.join(timeout)
@@ -188,19 +219,26 @@ def main():
             return input_queue.get().strip().upper()
 
     try:
-        # Read and split the data
-        df_extract, y = read_raw_str_csv_and_split_df(file_limit_2)
-
+        df_extract = read_raw_str_csv_and_split_df(v5_3_file)
+        
         if df_extract is not None:
             # Split into X and y
             X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+            y = df_extract['genre']
             categories = y.unique()
             num_classes = len(categories)
 
+            print("Check X info:")
+            print(X.head())
+            print("Check y info:")
+            print(y.head())
+
             # Prepare the data
             X_scaled, y_encoded, encoder, scaler = prepare_data(X, y, categories)
-
-
+            print("=======================> X AND Y SUCCESS")
+            print(f"y_encoded shape: {y_encoded.shape}")
+            print(f"Number of classes: {num_classes}")
+            
             y_encoded_one_hot = to_categorical(y_encoded, num_classes=num_classes)
             print(f"y_encoded_one_hot shape: {y_encoded_one_hot.shape}")
 
@@ -209,9 +247,14 @@ def main():
             else:
                 print("Error in data preparation")
                 raise ValueError("X_scaled or y_encoded is None")
-
+        
             model, history = build_and_train_model(X_train, y_train, X_test, y_test, X_scaled.shape[1], num_classes)
-            
+    
+            # Print training history (optional)
+            # print("Training history:")
+            # for key in history.history.keys():
+            #     print(f"{key}: {history.history[key]}")
+
             while True:
                 try:
                     prompt_for_start_predictor = get_input_with_timeout("Would you like to predict a genre (Y/N)? ")
@@ -253,12 +296,10 @@ def main():
         else:
             print("Error: DataFrame is None")
    
-
-
-        # --------------------- Evaluate model
+        # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
         
-        # --------------------- Save Pickles
+        # Save Pickles
         try:
             pickle_dir = 'pickles'
             if not os.path.exists(pickle_dir):
@@ -287,37 +328,7 @@ def main():
         
     except Exception as e:
         print(f"An error occurred in main block: {e}")
-# -----------------------------------------------------------------------------------------
-
-
-
-def not_main():
-    test_xtract = 'df_output/v4_file_depth_2.csv'
     
-    df_extract, y = read_raw_str_csv_and_split_df(test_xtract)
-    X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
-    categories = y.unique()
-    num_classes = len(categories)
-    
-    print("Check X info: ")
-    print(X.head())
-    print("X columns: ")
-    print(X.columns)
-    print("Check y info: ")
-    print(y.head())
-
-    print(f"Type of X: {type(X)}")
-    print(f"Type of y: {type(y)}")
-    print(f"Shapes of arrays in X BEFORE preparation:")
-    for col in X.columns:
-        for val in X[col]:
-            if isinstance(val, np.ndarray):
-                print(f"Column '{col}', shape: {val.shape}")
-            elif not isinstance(val, np.ndarray):
-                print(f"{RED}NOT NP ARRAY{RESET} -> Column '{col}', shape: {val.shape}")
-
 
 if __name__ == '__main__':
-    not_main()
-
-
+    main()

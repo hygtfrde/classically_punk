@@ -29,3 +29,20 @@ def prompt_for_gpu():
     else:
         print("Using CPU defaults for training.")
         tf.config.set_visible_devices([], 'GPU')
+        
+        
+def get_input_with_timeout(prompt, timeout=15):
+    print(prompt, end='', flush=True)
+    input_queue = queue.Queue()
+    def input_thread():
+        user_input = input()
+        input_queue.put(user_input)
+    thread = threading.Thread(target=input_thread)
+    thread.start()
+    thread.join(timeout)
+    
+    if thread.is_alive():
+        # Timeout occurred
+        return 'N'
+    else:
+        return input_queue.get().strip().upper()

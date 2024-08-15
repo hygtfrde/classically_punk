@@ -27,7 +27,8 @@ class MusicDataProcessor:
             file_output_name: str, 
             extract_raw_only: bool,
             compute_kde: bool,
-            compute_ecdf: bool
+            compute_ecdf: bool,
+            pad_and_truncate: bool
         ):
         self.dataset_path = dataset_path
         self.file_depth_limit = file_depth_limit
@@ -37,6 +38,7 @@ class MusicDataProcessor:
         self.extract_raw_only = extract_raw_only
         self.compute_kde = compute_kde
         self.compute_ecdf = compute_ecdf
+        self.pad_and_truncate = pad_and_truncate
 
         if not os.path.exists(df_output_dir):
             os.makedirs(df_output_dir)
@@ -49,10 +51,12 @@ class MusicDataProcessor:
             if isinstance(x, np.ndarray):
                 return json.dumps(x.tolist())  # Convert the array to a JSON string
             return x
-
-        # Apply the encoding to all elements in the DataFrame
-        encoded_df = self.data.applymap(encode_array)
         
+        # NP saves
+        # np.savez(f'{df_output_dir}/raw_features_{self.file_output_name}.npz', **features)
+        
+        # Apply the encoding to all elements in the DataFrame
+        encoded_df = self.data.map(encode_array)
         # Save the DataFrame to CSV
         encoded_df.to_csv(f'{df_output_dir}/{self.file_output_name}.csv', index=False)
         
@@ -86,29 +90,48 @@ class MusicDataProcessor:
 
     def extract_features(self, file_path, verbose='v'):
         try:
+            target_rows = 13
+            target_columns = 1293
             y, sr = librosa.load(file_path, sr=None)
             n_fft = min(1024, len(y))
+            
+            def pad_or_truncate(feature, target_columns):
+                # Truncate
+                if feature.shape[1] > target_columns:
+                    return feature[:, :target_columns]
+                # Pad
+                elif feature.shape[1] < target_columns:
+                    pad_width = target_columns - feature.shape[1]
+                    return np.pad(feature, ((0, 0), (0, pad_width)), mode='constant')
+                return feature
 
-            # Extract features
             features = {
-                'mfcc': librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, n_fft=n_fft),
-                'chroma': librosa.feature.chroma_stft(y=y, sr=sr, n_fft=n_fft),
+                'mfcc': librosa.feature.mfcc(y=y, sr=sr, n_mfcc=target_rows, n_fft=n_fft),
+                'chroma': librosa.feature.chroma_stft(y=y, sr=sr, hop_length=n_fft // 4),
                 'mel': librosa.feature.melspectrogram(y=y, sr=sr, n_fft=n_fft),
                 'contrast': librosa.feature.spectral_contrast(y=y, sr=sr, n_fft=n_fft),
                 'tonnetz': librosa.feature.tonnetz(y=y, sr=sr),
-                'spectral_bandwidth': librosa.feature.spectral_bandwidth(y=y, sr=sr),
+                'spectral_bandwidth': librosa.feature.spectral_bandwidth(y=y, sr=sr, n_fft=n_fft),
                 'spectral_flatness': librosa.feature.spectral_flatness(y=y),
-                'spectral_centroid': librosa.feature.spectral_centroid(y=y, sr=sr),
+                'spectral_centroid': librosa.feature.spectral_centroid(y=y, sr=sr, n_fft=n_fft),
                 'zero_crossing_rate': librosa.feature.zero_crossing_rate(y=y),
-                'harmony': librosa.effects.harmonic(y),
-                'perceptr': librosa.effects.percussive(y),
-                'tempo': librosa.beat.beat_track(y=y, sr=sr)[0],
-                'spectral_rolloff': librosa.feature.spectral_rolloff(y=y, sr=sr),
-                'rms': librosa.feature.rms(y=y)
+                'harmony': librosa.effects.harmonic(y).reshape(1, -1),  # Reshape to 2D array
+                'perceptr': librosa.effects.percussive(y).reshape(1, -1),  # Reshape to 2D array
+                'tempo': np.array([librosa.beat.beat_track(y=y, sr=sr)[0]]).reshape(1, 1),  # Ensure shape compatibility
+                'spectral_rolloff': librosa.feature.spectral_rolloff(y=y, sr=sr, n_fft=n_fft),
+                'rms': librosa.feature.rms(y=y, frame_length=n_fft)
             }
             
+            if self.pad_and_truncate:
+                for key in features:
+                    if len(features[key].shape) == 2:
+                        features[key] = pad_or_truncate(features[key], target_columns)
+                    else:
+                        # Handle 1D features (e.g., tempo, harmony)
+                        features[key] = pad_or_truncate(features[key].reshape(1, -1), target_columns)
+
+            
             if self.extract_raw_only is not None and self.extract_raw_only:
-                np.savez(f'{df_output_dir}/raw_features_{self.file_output_name}.npz', **features)
                 if verbose == 'v':
                     for name, array in features.items():
                         print(f"{name.capitalize()} Shape: {array.shape}")
@@ -178,8 +201,8 @@ def main():
     start_time = time.time()
     
     dataset_path = 'genres'  # Replace with the path to your audio dataset
-    file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'v4_full_huge'
+    file_depth_limit = 3  # Number of files to process per genre
+    file_output_name = 'v5_3_file'
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(
@@ -187,6 +210,7 @@ def main():
         file_output_name=file_output_name, 
         file_depth_limit=file_depth_limit,
         extract_raw_only=True,
+        pad_and_truncate=True,
         compute_kde=False,
         compute_ecdf=False
     )
