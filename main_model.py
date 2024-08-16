@@ -63,7 +63,7 @@ def read_raw_str_csv_and_split_df(csv_path):
                 print(f"{str(value)[:50]}")
             print()
             
-            if col not in ['filename', 'genre', 'harmony', 'perceptr', 'tempo']:
+            if col not in ['filename', 'genre']:
                 df_input[col] = df_input[col].apply(convert_string_to_array)
         
         print('BEGIN SHAPE TEST ----------------------------------------------------- ')
@@ -196,7 +196,7 @@ def main():
         
         if df_extract is not None:
             # Split into X and y
-            X = df_extract.drop(columns=['filename', 'genre', 'harmony', 'perceptr', 'tempo'])
+            X = df_extract.drop(columns=['filename', 'genre'])
             y = df_extract['genre']
             categories = y.unique()
             num_classes = len(categories)
