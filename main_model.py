@@ -8,7 +8,7 @@ import tensorflow as tf
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Input
