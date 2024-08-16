@@ -22,3 +22,10 @@ df_output/v3_full_kde.csv
 # PICKLES
 pickles/*
 !pickles
+
+# NOTEBOOK
+!notebook
+notebook/__pycache__
+notebook/.ipynb_checkpoints
+notebook/df_output
+notebook/pickles

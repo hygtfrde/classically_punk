@@ -1,0 +1,7 @@
+librosa
+pandas
+numpy 
+scikit-learn 
+tensorflow
+pyarrow
+fastparquet

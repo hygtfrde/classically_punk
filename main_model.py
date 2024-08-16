@@ -268,6 +268,9 @@ def main():
                     print(f"An error occurred in prediction block: {e}")
         else:
             print("Error: DataFrame is None")
+            
+        sys.stdout.flush()
+        os.system('clear') 
    
         # Evaluate model
         evaluate_all_rows(model, X_scaled, y, encoder, scaler)
@@ -299,7 +302,7 @@ def main():
         
     except Exception as e:
         print(f"An error occurred in main block: {e}")
-    
+
 
 
 if __name__ == '__main__':
