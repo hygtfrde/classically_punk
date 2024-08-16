@@ -1,5 +1,7 @@
 import os
 import importlib.util
+import queue
+import threading
 
 import tensorflow as tf
 
@@ -34,9 +36,11 @@ def prompt_for_gpu():
 def get_input_with_timeout(prompt, timeout=15):
     print(prompt, end='', flush=True)
     input_queue = queue.Queue()
+    
     def input_thread():
         user_input = input()
         input_queue.put(user_input)
+    
     thread = threading.Thread(target=input_thread)
     thread.start()
     thread.join(timeout)

@@ -201,8 +201,8 @@ def main():
     start_time = time.time()
     
     dataset_path = 'genres'  # Replace with the path to your audio dataset
-    file_depth_limit = 3  # Number of files to process per genre
-    file_output_name = 'v5_3_file'
+    file_depth_limit = None  # Number of files to process per genre
+    file_output_name = 'v5_full'
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(
