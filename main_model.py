@@ -187,12 +187,11 @@ def save_data(X_scaled, y, X_scaled_path='pickles/X_scaled.pkl', y_path='pickles
 # --------------------- MAIN
 # -----------------------------------------------------------------------------------------
 def main():
-    v5_test_2 = 'v5_2_files.csv'
     v5_test_5 = 'df_output/v5_5.csv'
     v5_full_stable_test = 'df_output/v5_full.csv'
 
     try:
-        df_extract = read_raw_str_csv_and_split_df(v5_test_2)
+        df_extract = read_raw_str_csv_and_split_df(v5_test_5)
         
         if df_extract is not None:
             # Split into X and y
