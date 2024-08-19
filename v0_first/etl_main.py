@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import librosa
 
-from audio_vizualizer import AudioDataVisualizer
+from scripts.audio_vizualizer import AudioDataVisualizer
 from aggregated_music_processor import MusicDataProcessor
 
 from helpers import get_user_input

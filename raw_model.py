@@ -15,6 +15,8 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Input
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+
 
 from CONSTANTS import RED, GREEN, RESET
 from helpers import get_input_with_timeout
@@ -22,9 +24,6 @@ from helpers import get_input_with_timeout
 
 def convert_string_to_array(value):
     try:
-        # print(f"Processing value of type: {type(value)}")
-        # print(f"Value starts with: {str(value)[:50]}")
-        
         if isinstance(value, str):
             value = value.strip('"').strip("'")
             try:
@@ -58,12 +57,6 @@ def read_raw_str_csv_and_split_df(csv_path):
         return None, None
     if df_input is not None:
         for col in df_input.columns:
-            # print(f"Column '{col}' data type: {df_input[col].dtype}")
-            # print(f"First 10 characters of values in column '{col}':")
-            # for value in df_input[col].head(5):
-            #     print(f"{str(value)[:50]}")
-            # print()
-            
             if col not in ['filename', 'genre']:
                 df_input[col] = df_input[col].apply(convert_string_to_array)
         return df_input
@@ -101,15 +94,36 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
         Dropout(0.2),
         Dense(num_classes, activation='softmax')
     ])
+    
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    # Add EarlyStopping and ReduceLROnPlateau callbacks
+    early_stopping = EarlyStopping(
+        monitor='val_loss', 
+        patience=100, 
+        restore_best_weights=True, 
+        verbose=1
+    )
+
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss', 
+        factor=0.5, 
+        patience=5, 
+        min_lr=1e-6, 
+        verbose=1
+    )
+
+    # Train the model with the callbacks
     history = model.fit(
         X_train, 
         y_train, 
         epochs=3000, 
         batch_size=128, 
         validation_data=(X_test, y_test),
+        callbacks=[early_stopping, reduce_lr],
         verbose=1
     )
+
     return model, history
 
 
@@ -172,6 +186,27 @@ def save_data(X_scaled, y, X_scaled_path='pickles/X_scaled.pkl', y_path='pickles
     except Exception as e:
         print(f"Error saving data: {e}")
 
+
+def save_pickles(model, encoder, scaler, X_scaled, y):
+    try:
+        pickle_dir = 'pickles'
+        if not os.path.exists(pickle_dir):
+            os.makedirs(pickle_dir)
+            print(f"Directory '{pickle_dir}' created.")
+        else:
+            print(f"Directory '{pickle_dir}' already exists.")
+        
+        model_path = os.path.join(pickle_dir, 'trained_model.pkl')
+        
+        with open(model_path, 'wb') as model_file:
+            pickle.dump(model, model_file)
+        
+        save_encoder_and_scaler(encoder, scaler)
+        save_data(X_scaled, y)
+        
+        print(f"Model saved to '{model_path}'")
+    except Exception as e:
+        print(f"Error in Pickle: {e}")
     
     
     
@@ -182,10 +217,11 @@ def main(raw_2d_data=True):
     v5_test_5 = 'df_output/v5_5.csv'
     v5_full_stable_test = 'df_output/v5_full.csv'
     v5_reduced_stats = 'df_output/v5_reduced_all_stats.csv'
+    v5_kde = 'v5_kde_full_all_stats'
 
     if raw_2d_data is True:
         try:
-            df_extract = read_raw_str_csv_and_split_df(v5_reduced_stats)
+            df_extract = read_raw_str_csv_and_split_df(v5_kde)
             
             if df_extract is not None:
                 # Split into X and y
@@ -226,37 +262,9 @@ def main(raw_2d_data=True):
                 print('======================================')
             else:
                 print("Error: DataFrame is None")
-                
-            
-            # # Save Pickles
-            # try:
-            #     pickle_dir = 'pickles'
-            #     if not os.path.exists(pickle_dir):
-            #         os.makedirs(pickle_dir)
-            #         print(f"Directory '{pickle_dir}' created.")
-            #     else:
-            #         print(f"Directory '{pickle_dir}' already exists.")
-                
-            #     model_path = os.path.join(pickle_dir, 'trained_model.pkl')
-                
-            #     with open(model_path, 'wb') as model_file:
-            #         pickle.dump(model, model_file)
-                
-            #     save_encoder_and_scaler(encoder, scaler)
-            #     save_data(X_scaled, y)
-                
-            #     print(f"Model saved to '{model_path}'")
-            # except Exception as e:
-            #     print(f"Error in Pickle: {e}")
             
         except Exception as e:
             print(f"An error occurred in main block: {e}")
-    
-    
-    
-    
-    
-    
     
     else:
         df_extract = pd.read_csv(v5_reduced_stats)

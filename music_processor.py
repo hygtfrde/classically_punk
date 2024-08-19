@@ -202,7 +202,7 @@ def main():
     
     dataset_path = 'genres'  # Replace with the path to your audio dataset
     file_depth_limit = None  # Number of files to process per genre
-    file_output_name = 'v5_reduced_all_stats'
+    file_output_name = 'v5_kde_full_all_stats'
 
     # Create an instance of the MusicDataProcessor
     processor = MusicDataProcessor(
@@ -211,8 +211,8 @@ def main():
         file_depth_limit=file_depth_limit,
         extract_raw_only=False,
         pad_and_truncate=True,
-        compute_kde=False,
-        compute_ecdf=False
+        compute_kde=True,
+        compute_ecdf=True
     )
 
     # Load data
