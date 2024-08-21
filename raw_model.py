@@ -14,7 +14,6 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Input
 from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 from CONSTANTS import RED, GREEN, RESET
 
@@ -90,22 +89,6 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
     
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    # Add EarlyStopping and ReduceLROnPlateau callbacks
-    early_stopping = EarlyStopping(
-        monitor='val_loss', 
-        patience=100, 
-        restore_best_weights=True, 
-        verbose=1
-    )
-
-    reduce_lr = ReduceLROnPlateau(
-        monitor='val_loss', 
-        factor=0.5, 
-        patience=5, 
-        min_lr=1e-6, 
-        verbose=1
-    )
-
     # Train the model with the callbacks
     history = model.fit(
         X_train, 
@@ -113,7 +96,6 @@ def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_cl
         epochs=3000, 
         batch_size=128, 
         validation_data=(X_test, y_test),
-        callbacks=[early_stopping, reduce_lr],
         verbose=1
     )
     return model, history
@@ -203,7 +185,7 @@ def save_pickles(model, encoder, scaler, X_scaled, y):
 
 # --------------------- MAIN
 # -----------------------------------------------------------------------------------------
-def main(raw_2d_data=True):
+def main():
     v5_test_5 = 'df_output/v5_5.csv'
     v5_full_stable_test = 'df_output/v5_full.csv'
     v5_reduced_stats = 'df_output/v5_reduced_all_stats.csv'
