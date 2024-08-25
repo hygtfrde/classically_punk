@@ -82,7 +82,7 @@ def prepare_data(X, y):
 def build_and_train_model(X_train, y_train, X_test, y_test, num_features, num_classes):
     model = Sequential([
         Input(shape=(num_features,)),
-        Dense(64, activation='relu'),
+        Dense(256, activation='relu'),
         Dropout(0.2),
         Dense(num_classes, activation='softmax')
     ])
@@ -119,8 +119,8 @@ def evaluate_all_rows(model, X, y, encoder, scaler):
     
     for i in range(total_count):
         # Extract feature inputs and true label
-        feature_inputs = X[i]  # Use standard NumPy indexing
-        true_label = y[i]  # Use standard NumPy indexing
+        feature_inputs = X[i]
+        true_label = y[i]
         # Make prediction
         predicted_class = predict(model, encoder, scaler, feature_inputs)
         # Check if the prediction matches the true label
@@ -149,7 +149,7 @@ def main():
     v5_kde = 'v5_kde_full_all_stats'
 
     try:
-        df_extract = read_raw_str_csv_and_split_df(v5_test_5)
+        df_extract = read_raw_str_csv_and_split_df(v5_full_stable_test)
         
         if df_extract is not None:
             # Split into X and y

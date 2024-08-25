@@ -105,8 +105,8 @@ def build_and_train_model(X_train, y_train, X_test, y_test, input_shape, num_cla
     history = model.fit(
         X_train, 
         y_train, 
-        epochs=20,  # Adjust as needed
-        batch_size=32, 
+        epochs=1000,
+        batch_size=128, 
         validation_data=(X_test, y_test),
         verbose=1
     )
@@ -128,7 +128,8 @@ def evaluate_all_rows(model, X, y, encoder):
     
     for i in range(total_count):
         feature_inputs = X[i]  # Use standard NumPy indexing
-        true_label = np.argmax(y[i])  # Convert one-hot to index
+        true_label_index = np.argmax(y[i])  # Convert one-hot to index
+        true_label = encoder.inverse_transform([true_label_index])[0]  # Convert index to class name
         predicted_class = predict(model, encoder, feature_inputs)
         if predicted_class == true_label:
             print(f"{GREEN}TRUE: {predicted_class} is {true_label}{RESET}")
@@ -145,11 +146,13 @@ def evaluate_all_rows(model, X, y, encoder):
 
 
 
+
 def main():
     v5_test_5 = 'df_output/v5_5.csv'
+    v5_full = 'df_output/v5_full.csv'
     
     try:
-        df_extract = read_raw_str_csv_and_split_df(v5_test_5)
+        df_extract = read_raw_str_csv_and_split_df(v5_full)
         
         if df_extract is not None:
             X = df_extract[['mfcc', 'chroma', 'mel', 'contrast', 'tonnetz']]
